@@ -2,11 +2,12 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useReducer, useRef } from "react";
-import { queryKeys, useTicketCacheSync } from "@/lib/queries";
+import { useTicketCacheSync } from "@/lib/queries";
 import {
   BUSY,
   IDLE_TRIAGE,
   runTriageStream,
+  staleQueriesFor,
   triageReducer,
   type TriageAction,
   type TriageOutcome,
@@ -20,48 +21,56 @@ export type {
   TriageStreamState,
 } from "@/lib/triage-stream";
 
-const STALE_TICKET_CODES = new Set(["invalid_state", "not_found"]);
+type ActiveRun = { id: number; controller: AbortController };
 
 export function useTriageStream() {
   const [state, dispatch] = useReducer(triageReducer, IDLE_TRIAGE);
-  const controller = useRef<AbortController | null>(null);
+  const active = useRef<ActiveRun | null>(null);
+  const lastRunId = useRef(0);
   const queryClient = useQueryClient();
   const sync = useTicketCacheSync();
 
-  useEffect(() => () => controller.current?.abort(), []);
+  useEffect(
+    () => () => {
+      const run = active.current;
+      if (!run) return;
+      run.controller.abort();
+      active.current = null;
+      dispatch({ type: "cancel", runId: run.id });
+    },
+    [],
+  );
 
   const start = useCallback(
     async (ticketId: string): Promise<TriageOutcome> => {
-      if (controller.current) return BUSY;
-      const run = new AbortController();
-      controller.current = run;
+      if (active.current) return BUSY;
+      lastRunId.current += 1;
+      const run: ActiveRun = { id: lastRunId.current, controller: new AbortController() };
+      active.current = run;
       const handle = (action: TriageAction) => {
         if (action.type === "done") sync(action.ticket);
         dispatch(action);
       };
       try {
-        const outcome = await runTriageStream(ticketId, { signal: run.signal, dispatch: handle });
-        if (!outcome.ok) {
-          if (outcome.error.code === "llm_unavailable") {
-            void queryClient.invalidateQueries({ queryKey: queryKeys.health });
-          }
-          if (STALE_TICKET_CODES.has(outcome.error.code)) {
-            void queryClient.invalidateQueries({ queryKey: queryKeys.ticket(ticketId) });
-            void queryClient.invalidateQueries({ queryKey: ["tickets"] });
-            void queryClient.invalidateQueries({ queryKey: queryKeys.stats });
-          }
+        const outcome = await runTriageStream(ticketId, {
+          runId: run.id,
+          signal: run.controller.signal,
+          dispatch: handle,
+        });
+        for (const queryKey of staleQueriesFor(ticketId, outcome)) {
+          void queryClient.invalidateQueries({ queryKey });
         }
         return outcome;
       } finally {
-        if (controller.current === run) controller.current = null;
+        if (active.current === run) active.current = null;
       }
     },
     [queryClient, sync],
   );
 
   const reset = useCallback(() => {
-    controller.current?.abort();
-    controller.current = null;
+    active.current?.controller.abort();
+    active.current = null;
     dispatch({ type: "reset" });
   }, []);
 

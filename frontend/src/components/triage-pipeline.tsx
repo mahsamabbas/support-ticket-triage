@@ -40,11 +40,14 @@ export function TriagePipeline({ ticket, stream }: { ticket: Ticket; stream: Tri
         </h3>
         {saved && <span className="font-mono text-[11px] text-muted-foreground">{saved.model}</span>}
       </div>
-      <ol aria-live="polite" className="flex flex-col gap-3">
+      <ol className="flex flex-col gap-3">
         {steps.map((step, index) => (
           <PipelineStep key={step.key} step={step} index={index + 1} />
         ))}
       </ol>
+      <p aria-live="polite" className="sr-only">
+        {live?.running ? steps.map((step) => `${step.title}: ${stepStatus(step)}.`).join(" ") : ""}
+      </p>
       {live?.error && (
         <p role="alert" className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {live.error.message}
@@ -61,6 +64,11 @@ const STATUS_TEXT: Record<StepState, string> = {
   error: "failed",
 };
 
+function stepStatus(step: StepView): string {
+  if (step.state === "done" && step.ms !== undefined) return `done, ${formatMs(step.ms)}`;
+  return STATUS_TEXT[step.state];
+}
+
 function PipelineStep({ step, index }: { step: Step; index: number }) {
   const marker = {
     idle: <span>{index}</span>,
@@ -71,12 +79,10 @@ function PipelineStep({ step, index }: { step: Step; index: number }) {
   let timing = "";
   if (step.state === "running") timing = "running…";
   else if (step.ms !== undefined) timing = formatMs(step.ms);
-  const status =
-    step.state === "done" && step.ms !== undefined ? `done, ${formatMs(step.ms)}` : STATUS_TEXT[step.state];
   return (
     <li className="flex items-center gap-3">
       <span className="sr-only">
-        {step.title}: {status}
+        {step.title}: {stepStatus(step)}
       </span>
       <motion.span
         layout

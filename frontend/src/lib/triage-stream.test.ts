@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "./api";
+import { queryKeys } from "./queries";
 import {
   IDLE_TRIAGE,
   runTriageStream,
+  staleQueriesFor,
   triageReducer,
   type TriageAction,
   type TriageStreamState,
@@ -61,8 +63,12 @@ function harness() {
 
 async function run(signal = new AbortController().signal) {
   const { box, dispatch } = harness();
-  const outcome = await runTriageStream("NG-1001", { signal, dispatch });
+  const outcome = await runTriageStream("NG-1001", { runId: 1, signal, dispatch });
   return { outcome, state: box.state, dispatch };
+}
+
+function started(runId = 1, ticketId = "NG-1001") {
+  return triageReducer(IDLE_TRIAGE, { type: "start", runId, ticketId });
 }
 
 afterEach(() => {
@@ -71,30 +77,92 @@ afterEach(() => {
 
 describe("triageReducer", () => {
   it("starts a run with classify running", () => {
-    const state = triageReducer(IDLE_TRIAGE, { type: "start", ticketId: "NG-1001" });
-    expect(state).toMatchObject({ ticketId: "NG-1001", running: true, classify: { state: "running" } });
+    expect(started()).toMatchObject({
+      runId: 1,
+      ticketId: "NG-1001",
+      running: true,
+      classify: { state: "running" },
+    });
   });
 
   it("refuses a second start while a run is in flight", () => {
-    const running = triageReducer(IDLE_TRIAGE, { type: "start", ticketId: "NG-1001" });
-    expect(triageReducer(running, { type: "start", ticketId: "NG-2002" })).toBe(running);
+    const running = started();
+    expect(triageReducer(running, { type: "start", runId: 2, ticketId: "NG-2002" })).toBe(running);
   });
 
   it("reset clears everything back to idle", () => {
-    let state = triageReducer(IDLE_TRIAGE, { type: "start", ticketId: "NG-1001" });
-    state = triageReducer(state, { type: "draft_token", text: "Hi" });
+    const state = triageReducer(started(), { type: "draft_token", runId: 1, text: "Hi" });
     expect(triageReducer(state, { type: "reset" })).toEqual(IDLE_TRIAGE);
   });
 
   it("stays running between draft done and the done event", () => {
-    let state = triageReducer(IDLE_TRIAGE, { type: "start", ticketId: "NG-1001" });
-    state = triageReducer(state, { type: "step", step: { name: "draft", state: "done", ms: 5 } });
+    const state = triageReducer(started(), {
+      type: "step",
+      runId: 1,
+      step: { name: "draft", state: "done", ms: 5 },
+    });
     expect(state.running).toBe(true);
-    expect(triageReducer(state, { type: "done", ticket: TICKET }).running).toBe(false);
+    expect(triageReducer(state, { type: "done", runId: 1, ticket: TICKET }).running).toBe(false);
   });
 
   it("ignores stream events when no run is in flight", () => {
-    expect(triageReducer(IDLE_TRIAGE, { type: "draft_token", text: "stray" })).toBe(IDLE_TRIAGE);
+    expect(triageReducer(IDLE_TRIAGE, { type: "draft_token", runId: 1, text: "stray" })).toBe(IDLE_TRIAGE);
+  });
+
+  it("cancel stops the run and puts running steps back to idle", () => {
+    let state = triageReducer(started(), {
+      type: "step",
+      runId: 1,
+      step: { name: "classify", state: "done", ms: 900 },
+    });
+    state = triageReducer(state, { type: "step", runId: 1, step: { name: "draft", state: "started" } });
+    state = triageReducer(state, { type: "cancel", runId: 1 });
+    expect(state).toMatchObject({
+      running: false,
+      classify: { state: "done", ms: 900 },
+      draft: { state: "idle" },
+      error: null,
+    });
+  });
+
+  it("ignores actions tagged with a stale run id", () => {
+    const state = started(2);
+    expect(triageReducer(state, { type: "draft_token", runId: 1, text: "old" })).toBe(state);
+    expect(triageReducer(state, { type: "cancel", runId: 1 })).toBe(state);
+    expect(triageReducer(state, { type: "fail", runId: 1, error: { code: "x", message: "y" } })).toBe(state);
+  });
+
+  it("lets a new run start after a cancel and applies only its events", () => {
+    let state = triageReducer(started(1, "NG-1001"), { type: "cancel", runId: 1 });
+    state = triageReducer(state, { type: "start", runId: 2, ticketId: "NG-2002" });
+    state = triageReducer(state, { type: "draft_token", runId: 1, text: "from A" });
+    state = triageReducer(state, { type: "draft_token", runId: 2, text: "from B" });
+    expect(state).toMatchObject({ runId: 2, ticketId: "NG-2002", running: true, draftText: "from B" });
+  });
+});
+
+describe("staleQueriesFor", () => {
+  it("refreshes nothing extra after a successful run", () => {
+    expect(staleQueriesFor("NG-1001", { ok: true, ticket: TICKET })).toEqual([]);
+  });
+
+  it("refreshes health when the model is unavailable", () => {
+    const outcome = { ok: false as const, error: { code: "llm_unavailable", message: "down" } };
+    expect(staleQueriesFor("NG-1001", outcome)).toEqual([queryKeys.health]);
+  });
+
+  it.each(["invalid_state", "not_found"])("refreshes the ticket, lists and stats on %s", (code) => {
+    const outcome = { ok: false as const, error: { code, message: "stale" } };
+    expect(staleQueriesFor("NG-1001", outcome)).toEqual([
+      queryKeys.ticket("NG-1001"),
+      ["tickets"],
+      queryKeys.stats,
+    ]);
+  });
+
+  it("refreshes nothing for transient failures", () => {
+    const outcome = { ok: false as const, error: { code: "network_error", message: "lost" } };
+    expect(staleQueriesFor("NG-1001", outcome)).toEqual([]);
   });
 });
 
@@ -204,7 +272,7 @@ describe("runTriageStream", () => {
       sseResponse([frame("step", { name: "classify", state: "started" })], signal, "error-on-abort"),
     );
     const { box, dispatch } = harness();
-    const pending = runTriageStream("NG-1001", { signal: controller.signal, dispatch });
+    const pending = runTriageStream("NG-1001", { runId: 1, signal: controller.signal, dispatch });
     await vi.waitFor(() => expect(box.state.classify.state).toBe("running"));
     const callsBeforeAbort = dispatch.mock.calls.length;
     controller.abort();
@@ -219,7 +287,7 @@ describe("runTriageStream", () => {
       sseResponse([frame("step", { name: "classify", state: "started" })], signal, "late-frame-on-abort"),
     );
     const { box, dispatch } = harness();
-    const pending = runTriageStream("NG-1001", { signal: controller.signal, dispatch });
+    const pending = runTriageStream("NG-1001", { runId: 1, signal: controller.signal, dispatch });
     await vi.waitFor(() => expect(box.state.classify.state).toBe("running"));
     const callsBeforeAbort = dispatch.mock.calls.length;
     controller.abort();
