@@ -35,6 +35,8 @@ class ClassificationOut(BaseModel):
     urgency: Urgency
     queue: RoutableQueue
     reason: str = Field(min_length=1, max_length=200)
+    # Must stay before `confidence`: the model commits to it before scoring confidence.
+    concrete_issue: bool
     confidence: float = Field(ge=0, le=1)
 
     @field_validator("reason")

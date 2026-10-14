@@ -8,6 +8,7 @@ from app.domain.taxonomy import (
     Flag,
     Queue,
     RoutableQueue,
+    Urgency,
 )
 from app.schemas import ClassificationOut, ReviewRequest, TicketCreate
 
@@ -18,6 +19,7 @@ def make(**overrides) -> ClassificationOut:
         "urgency": "high",
         "queue": "Billing Team",
         "reason": "Duplicate charge needs a refund review.",
+        "concrete_issue": True,
         "confidence": 0.9,
     }
     data.update(overrides)
@@ -50,6 +52,61 @@ def test_disallowed_route_is_flagged_inconsistent():
 def test_both_flags_can_apply():
     result = apply_policy(make(queue="Logistics", confidence=0.2), threshold=0.6)
     assert result.flags == [Flag.LOW_CONFIDENCE, Flag.INCONSISTENT_ROUTE]
+
+
+def test_missing_details_routes_to_manual_triage_and_keeps_model_values():
+    result = apply_policy(make(concrete_issue=False), threshold=0.6)
+    assert result.queue == Queue.MANUAL_TRIAGE
+    assert result.flags == [Flag.MISSING_DETAILS]
+    assert (result.category, result.urgency, result.confidence) == (
+        Category.BILLING,
+        Urgency.HIGH,
+        0.9,
+    )
+
+
+def test_suspected_injection_routes_to_manual_triage_and_keeps_model_values():
+    result = apply_policy(make(urgency="critical"), threshold=0.6, injection_suspected=True)
+    assert result.queue == Queue.MANUAL_TRIAGE
+    assert result.flags == [Flag.POSSIBLE_INJECTION]
+    assert (result.category, result.urgency, result.confidence) == (
+        Category.BILLING,
+        Urgency.CRITICAL,
+        0.9,
+    )
+
+
+def test_injection_is_not_suspected_by_default():
+    assert apply_policy(make(), threshold=0.6).flags == []
+
+
+def test_all_flags_can_apply_together():
+    classification = make(queue="Logistics", confidence=0.2, concrete_issue=False)
+    result = apply_policy(classification, threshold=0.6, injection_suspected=True)
+    assert result.flags == [
+        Flag.LOW_CONFIDENCE,
+        Flag.INCONSISTENT_ROUTE,
+        Flag.MISSING_DETAILS,
+        Flag.POSSIBLE_INJECTION,
+    ]
+    assert result.queue == Queue.MANUAL_TRIAGE
+
+
+def test_concrete_issue_is_required_and_comes_before_confidence():
+    with pytest.raises(ValidationError):
+        ClassificationOut(
+            category="billing",
+            urgency="high",
+            queue="Billing Team",
+            reason="Duplicate charge.",
+            confidence=0.9,
+        )
+    fields = list(ClassificationOut.model_fields)
+    assert fields.index("reason") < fields.index("concrete_issue") < fields.index("confidence")
+    schema = ClassificationOut.model_json_schema()
+    assert "concrete_issue" in schema["required"]
+    properties = list(schema["properties"])
+    assert properties.index("concrete_issue") < properties.index("confidence")
 
 
 def test_fallback_is_manual_with_invalid_flag():

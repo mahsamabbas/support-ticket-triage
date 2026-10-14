@@ -137,7 +137,7 @@ export interface components {
          * Flag
          * @enum {string}
          */
-        Flag: "low_confidence" | "inconsistent_route" | "ai_output_invalid";
+        Flag: "low_confidence" | "inconsistent_route" | "ai_output_invalid" | "missing_details" | "possible_injection";
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */

@@ -32,6 +32,8 @@ const FLAG_COPY: Record<Flag, string> = {
   low_confidence: "Low confidence",
   inconsistent_route: "Category and queue disagree",
   ai_output_invalid: "Model output failed validation",
+  missing_details: "No concrete problem described",
+  possible_injection: "Ticket contains instructions aimed at the AI",
 };
 
 const SECTION_LABEL = "font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground";

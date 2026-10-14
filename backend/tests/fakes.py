@@ -17,6 +17,7 @@ def classification_json(**overrides) -> str:
         "urgency": "high",
         "queue": "Billing Team",
         "reason": "Duplicate card charge on order #4521 needs a refund review.",
+        "concrete_issue": True,
         "confidence": 0.92,
     }
     data.update(overrides)

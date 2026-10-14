@@ -9,12 +9,12 @@ Portfolio app 6 of 10. Scope: classify sample tickets, explain the suggested que
 ## What it does
 
 - **Two-step LangChain pipeline.** *Classify* returns JSON constrained by a JSON schema and validated by Pydantic (one repair retry). *Draft* streams the reply token by token.
-- **Routing policy in code, not in the prompt.** Confidence below 0.6, or a queue that does not serve the category, sends the ticket to `Needs Manual Triage` with a flag. The draft then only asks the customer for details.
+- **Routing policy in code, not in the prompt.** Confidence below 0.6, a queue that does not serve the category, or the model reporting that the ticket states no concrete problem (`concrete_issue: false`) sends the ticket to `Needs Manual Triage` with a flag. The draft then only asks the customer for details.
 - **Live pipeline over SSE.** Both steps animate in the UI with their timings.
 - **Human in control.** Category, urgency and queue are editable; Approve is blocked until the route is valid. Every change against the AI suggestion shows as an audit chip.
 - **Triage all new.** One click walks every new ticket through the pipeline with a progress bar. **Stop** ends the run at any time, and it stops by itself if the model or API goes offline. You can keep browsing other tickets while it runs.
 - **Keyboard first.** Shortcuts for navigation, triage and review, plus a command palette to jump to any ticket or filter by queue.
-- **Prompt-injection guard.** Ticket text is fenced as data and the model is told never to follow it.
+- **Prompt-injection safeguards.** Ticket text is fenced as data in the prompt, and a code-level detector flags instruction-like text (override phrases, fake system turns, commands that set triage fields, output-format demands) and forces manual triage. Neither is a guarantee.
 
 | Live triage | Manual triage | Approved with overrides |
 | --- | --- | --- |
@@ -134,28 +134,33 @@ Letter shortcuts are ignored while typing in a field or when a dialog is open.
 ## Tests
 
 ```bash
-cd backend && .venv/bin/pytest -q    # 110 passed
+cd backend && .venv/bin/pytest -q    # 179 passed
 cd frontend && npm test              # 85 passed
 ```
 
 Normal case: a double-charge ticket is classified `billing` / `high` / `Billing Team` and the draft streams and saves.
-Failure cases: low confidence, queue that does not fit the category, broken model JSON (repair then fallback), Chinese/Japanese/Korean text in the reason (repair, then manual-triage fallback), model picking the manual queue, empty or oversized tickets, Ollama down (503), draft failing mid-stream, approving twice (409), approving into manual triage or a wrong queue (422).
+Failure cases: low confidence, queue that does not fit the category, no concrete problem described, instruction-like text in the subject or body, broken model JSON (repair then fallback), Chinese/Japanese/Korean text in the reason (repair, then manual-triage fallback), model picking the manual queue, empty or oversized tickets, Ollama down (503), draft failing mid-stream, approving twice (409), approving into manual triage or a wrong queue (422).
 
 ## Evaluation
 
-`backend/scripts/eval_triage.py` classifies the 10 seed tickets and 12 held-out tickets with the live model and scores category, urgency and queue against expected labels (`cd backend && .venv/bin/python -m scripts.eval_triage --out ../docs/eval-results.md`).
+`backend/scripts/eval_triage.py` classifies the 10 seed tickets and two sets of 12 held-out tickets with the live model, applies the same policy and injection check as the API, and scores category, urgency and queue against expected labels (`cd backend && .venv/bin/python -m scripts.eval_triage --out ../docs/eval-results.md`).
 
-Latest run (`qwen2.5:7b`, median classify 1133 ms):
+Before the safeguards: Seed queue 9/10 · held-out v1 queue 9/12. The v1 prompt-injection ticket was routed as the injected text demanded and both vague v1 tickets were routed instead of sent to manual triage.
 
-- Seed tickets: Category 8/8 · Urgency 7/8 · Queue 9/10
-- Held-out tickets: Category 9/10 · Urgency 8/10 · Queue 9/12
+After the safeguards (`qwen2.5:7b`, median classify 1440 ms):
 
-The classify prompt was tuned on the seed tickets, so the held-out line is the honest number. Held-out misses: the prompt-injection ticket was routed as the injected text demanded (`billing` / `critical` / `Billing Team`), both vague tickets went to Customer Care instead of manual triage, and one address change was rated `medium` instead of `low`. Full table in [docs/eval-results.md](docs/eval-results.md).
+- Seed tickets: Category 8/8 · Urgency 7/8 · Queue 8/10
+- Held-out v1 (used to diagnose the fixes): Category 9/10 · Urgency 8/10 · Queue 7/12
+- Held-out v2 (written blind, run once): Category 8/10 · Urgency 9/10 · Queue 6/12
+
+The prompt was tuned on the seed set and the safeguards were designed from the v1 misses, so the v2 line is the honest number. The injection ticket and all six vague tickets now land in manual triage, but the model often reports `concrete_issue: false` for clear, simple questions, so 9 answerable tickets across the three sets were sent to manual triage too, which is why queue accuracy fell. Full table in [docs/eval-results.md](docs/eval-results.md).
 
 ## Known limitations
 
 - 7B local model: labels and drafts vary between runs, and a draft can still slip past a prompt rule (for example implying a refund). The human review step is the safeguard.
 - Confidence is the model's self-reported score, steered by a rubric and examples in the prompt. It is not a calibrated probability.
+- Model-reported signals can be wrong: `concrete_issue` currently flags many clear, simple questions, sending them to manual triage.
+- The injection detector is a set of regular expressions. A paraphrased attack can get past it, and unusual but honest wording can trip it (it only ever sends a ticket to manual triage).
 - Single agent, no authentication.
 - The draft is not regenerated after the agent changes the classification.
 - SQLite file storage, no multi-user concurrency.

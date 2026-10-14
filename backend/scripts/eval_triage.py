@@ -11,12 +11,25 @@ from pathlib import Path
 from time import perf_counter
 
 from app.config import Settings, get_settings
+from app.domain.injection import ticket_looks_like_injection
 from app.domain.policy import apply_policy, fallback_result
 from app.llm.chains import LLMUnavailableError, classify
 from app.llm.client import OllamaProvider
 from app.schemas import PolicyResult
 from app.seed import SEED_TICKETS, SeedTicket
 from scripts.eval_cases import HELD_OUT_TICKETS
+from scripts.eval_cases_v2 import HELD_OUT_V2
+
+BEFORE_SAFEGUARDS = (
+    "Before the safeguards (16dbf02): Seed queue 9/10 · held-out v1 queue 9/12. EV-09 obeyed "
+    "the injected instructions; EV-11 and EV-12 were routed instead of sent to manual triage."
+)
+
+EVAL_SETS: tuple[tuple[str, Sequence[SeedTicket]], ...] = (
+    ("Seed tickets (used while tuning the prompt)", SEED_TICKETS),
+    ("Held-out v1 (used to diagnose these fixes)", HELD_OUT_TICKETS),
+    ("Held-out v2 (written blind, run once after the fixes)", HELD_OUT_V2),
+)
 
 
 class EvalAbortedError(Exception):
@@ -44,6 +57,9 @@ class Row:
         return self.result.queue == self.seed.expected_queue
 
 
+Section = tuple[str, list[Row]]
+
+
 async def _classify_all(
     provider: OllamaProvider, settings: Settings, tickets: Sequence[SeedTicket]
 ) -> list[Row]:
@@ -62,17 +78,22 @@ async def _classify_all(
         if classification is None:
             result = fallback_result()
         else:
-            result = apply_policy(classification, settings.confidence_threshold)
+            result = apply_policy(
+                classification,
+                settings.confidence_threshold,
+                injection_suspected=ticket_looks_like_injection(ticket),
+            )
         rows.append(Row(ticket, result, classify_ms))
+        flags = ", ".join(flag.value for flag in result.flags) or "no flags"
         print(
             f"{ticket.id}: {result.category} / {result.urgency} / {result.queue} "
-            f"({classify_ms} ms)",
+            f"[{flags}] ({classify_ms} ms)",
             file=sys.stderr,
         )
     return rows
 
 
-async def evaluate(settings: Settings) -> tuple[list[Row], list[Row]]:
+async def evaluate(settings: Settings) -> list[Section]:
     provider = OllamaProvider(settings)
     reachable, available = await provider.health()
     if not reachable:
@@ -84,9 +105,9 @@ async def evaluate(settings: Settings) -> tuple[list[Row], list[Row]]:
             f"Model {provider.model_name} is not available. "
             f"Run `ollama pull {provider.model_name}`."
         )
-    seed_rows = await _classify_all(provider, settings, SEED_TICKETS)
-    held_out_rows = await _classify_all(provider, settings, HELD_OUT_TICKETS)
-    return seed_rows, held_out_rows
+    return [
+        (title, await _classify_all(provider, settings, tickets)) for title, tickets in EVAL_SETS
+    ]
 
 
 def _mark(ok: bool | None) -> str:
@@ -129,14 +150,8 @@ def _section(title: str, rows: list[Row]) -> list[str]:
     return lines
 
 
-def render(
-    model: str,
-    threshold: float,
-    run_date: date,
-    seed_rows: list[Row],
-    held_out_rows: list[Row],
-) -> str:
-    latencies = [row.classify_ms for row in seed_rows + held_out_rows]
+def render(model: str, threshold: float, run_date: date, sections: list[Section]) -> str:
+    latencies = [row.classify_ms for _, rows in sections for row in rows]
     lines = [
         f"# Triage eval — `{model}`",
         "",
@@ -144,13 +159,14 @@ def render(
         f"classify latency mean {statistics.mean(latencies):.0f} ms, "
         f"median {statistics.median(latencies):.0f} ms over {len(latencies)} tickets",
         "",
-        "The classify prompt was tuned against the seed tickets, so the held-out score is the "
-        "honest number. An expected label of `any` is not scored.",
+        BEFORE_SAFEGUARDS,
         "",
-        *_section("Seed tickets (used while tuning the prompt)", seed_rows),
-        "",
-        *_section("Held-out tickets", held_out_rows),
+        "The classify prompt was tuned against the seed tickets and the safeguards were designed "
+        "after reading the held-out v1 misses, so held-out v2 is the honest number. An expected "
+        "label of `any` is not scored.",
     ]
+    for title, rows in sections:
+        lines += ["", *_section(title, rows)]
     return "\n".join(lines) + "\n"
 
 
@@ -160,15 +176,11 @@ def main() -> None:
     args = parser.parse_args()
     settings = get_settings()
     try:
-        seed_rows, held_out_rows = asyncio.run(evaluate(settings))
+        sections = asyncio.run(evaluate(settings))
     except EvalAbortedError as exc:
         sys.exit(str(exc))
     report = render(
-        settings.ollama_model,
-        settings.confidence_threshold,
-        datetime.now(UTC).date(),
-        seed_rows,
-        held_out_rows,
+        settings.ollama_model, settings.confidence_threshold, datetime.now(UTC).date(), sections
     )
     print(report, end="")
     if args.out:

@@ -6,13 +6,19 @@ FALLBACK_REASON = (
 )
 
 
-def apply_policy(classification: ClassificationOut, threshold: float) -> PolicyResult:
+def apply_policy(
+    classification: ClassificationOut, threshold: float, *, injection_suspected: bool = False
+) -> PolicyResult:
     queue = Queue(classification.queue.value)
     flags: list[Flag] = []
     if classification.confidence < threshold:
         flags.append(Flag.LOW_CONFIDENCE)
     if not is_route_allowed(classification.category, queue):
         flags.append(Flag.INCONSISTENT_ROUTE)
+    if not classification.concrete_issue:
+        flags.append(Flag.MISSING_DETAILS)
+    if injection_suspected:
+        flags.append(Flag.POSSIBLE_INJECTION)
     return PolicyResult(
         category=classification.category,
         urgency=classification.urgency,

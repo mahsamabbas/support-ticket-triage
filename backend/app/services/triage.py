@@ -4,6 +4,7 @@ from time import perf_counter
 from typing import Any
 
 from app.db import TicketRepository, TicketStateChangedError
+from app.domain.injection import ticket_looks_like_injection
 from app.domain.policy import apply_policy, fallback_result
 from app.domain.taxonomy import TicketStatus
 from app.llm.chains import LLMUnavailableError, classify, stream_draft
@@ -55,7 +56,11 @@ class TriageService:
         if classification is None:
             result = fallback_result()
         else:
-            result = apply_policy(classification, self._threshold)
+            result = apply_policy(
+                classification,
+                self._threshold,
+                injection_suspected=ticket_looks_like_injection(ticket),
+            )
         classify_ms = _elapsed_ms(started)
         yield TriageEvent("step", {"name": "classify", "state": "done", "ms": classify_ms})
         yield TriageEvent("classified", result.model_dump(mode="json"))

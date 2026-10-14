@@ -37,6 +37,8 @@ class Flag(StrEnum):
     LOW_CONFIDENCE = "low_confidence"
     INCONSISTENT_ROUTE = "inconsistent_route"
     AI_OUTPUT_INVALID = "ai_output_invalid"
+    MISSING_DETAILS = "missing_details"
+    POSSIBLE_INJECTION = "possible_injection"
 
 
 class TicketStatus(StrEnum):
