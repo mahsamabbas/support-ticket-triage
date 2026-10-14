@@ -23,7 +23,7 @@ export function TriageAllButton({ progress, disabled, onClick, onStop }: Props) 
             aria-label="Triage all progress"
             className="h-1.5"
           />
-          <span className="tabular-nums">
+          <span className="tabular-nums" aria-live="polite">
             {progress.done}/{progress.total}
           </span>
         </div>
@@ -33,6 +33,7 @@ export function TriageAllButton({ progress, disabled, onClick, onStop }: Props) 
         size="sm"
         onClick={progress ? onStop : onClick}
         disabled={progress ? false : disabled}
+        aria-label={progress ? "Stop triage all" : undefined}
       >
         {progress ? <Square className="size-4" /> : <ListChecks className="size-4" />}
         {progress ? "Stop" : "Triage all new"}

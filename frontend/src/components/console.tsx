@@ -143,7 +143,8 @@ export function Console() {
       );
       const summary = bulkSummary(result);
       if (summary) toast[summary.kind](summary.message);
-    } catch {
+    } catch (error) {
+      console.error(error);
       toast.error("Triage all stopped unexpectedly.");
     } finally {
       bulkRunning.current = false;
