@@ -134,12 +134,23 @@ Letter shortcuts are ignored while typing in a field or when a dialog is open.
 ## Tests
 
 ```bash
-cd backend && .venv/bin/pytest -q    # 104 passed
+cd backend && .venv/bin/pytest -q    # 110 passed
 cd frontend && npm test              # 85 passed
 ```
 
 Normal case: a double-charge ticket is classified `billing` / `high` / `Billing Team` and the draft streams and saves.
 Failure cases: low confidence, queue that does not fit the category, broken model JSON (repair then fallback), Chinese/Japanese/Korean text in the reason (repair, then manual-triage fallback), model picking the manual queue, empty or oversized tickets, Ollama down (503), draft failing mid-stream, approving twice (409), approving into manual triage or a wrong queue (422).
+
+## Evaluation
+
+`backend/scripts/eval_triage.py` classifies the 10 seed tickets and 12 held-out tickets with the live model and scores category, urgency and queue against expected labels (`cd backend && .venv/bin/python -m scripts.eval_triage --out ../docs/eval-results.md`).
+
+Latest run (`qwen2.5:7b`, median classify 1133 ms):
+
+- Seed tickets: Category 8/8 · Urgency 7/8 · Queue 9/10
+- Held-out tickets: Category 9/10 · Urgency 8/10 · Queue 9/12
+
+The classify prompt was tuned on the seed tickets, so the held-out line is the honest number. Held-out misses: the prompt-injection ticket was routed as the injected text demanded (`billing` / `critical` / `Billing Team`), both vague tickets went to Customer Care instead of manual triage, and one address change was rated `medium` instead of `low`. Full table in [docs/eval-results.md](docs/eval-results.md).
 
 ## Known limitations
 
