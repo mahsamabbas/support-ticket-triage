@@ -134,7 +134,7 @@ Letter shortcuts are ignored while typing in a field or when a dialog is open.
 ## Tests
 
 ```bash
-cd backend && .venv/bin/pytest -q    # 103 passed
+cd backend && .venv/bin/pytest -q    # 104 passed
 cd frontend && npm test              # 85 passed
 ```
 
@@ -143,7 +143,7 @@ Failure cases: low confidence, queue that does not fit the category, broken mode
 
 ## Known limitations
 
-- 7B local model: labels and drafts vary between runs.
+- 7B local model: labels and drafts vary between runs, and a draft can still slip past a prompt rule (for example implying a refund). The human review step is the safeguard.
 - Confidence is the model's self-reported score, steered by a rubric and examples in the prompt. It is not a calibrated probability.
 - Single agent, no authentication.
 - The draft is not regenerated after the agent changes the classification.

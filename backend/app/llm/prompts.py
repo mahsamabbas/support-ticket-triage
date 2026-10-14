@@ -68,7 +68,8 @@ Rules:
 - Plain text only, 60 to 140 words, warm and professional.
 - Write in English only.
 - Greet the customer by first name.
-- Never promise refunds, replacements, compensation or delivery dates.
+- Never promise or imply refunds, replacements, compensation or delivery dates. Do not say a \
+refund will be issued or handled; say the team will review the request and follow up.
 - Never invent order details, policies or facts that are not in the ticket.
 - End with the sign-off: NovaGear Support
 {INJECTION_RULE}"""

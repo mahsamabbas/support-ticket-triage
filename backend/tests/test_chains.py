@@ -202,6 +202,13 @@ def test_draft_prompt_requires_english():
     assert "Write in English only." in messages[0].content
 
 
+def test_draft_prompt_forbids_implying_a_refund():
+    messages = DRAFT_PROMPT.format_messages(
+        instruction="Reply.", customer_name="Eve", subject="Late order", body="Where is my order?"
+    )
+    assert "Do not say a refund will be issued or handled" in messages[0].content
+
+
 def test_classify_prompt_keeps_the_confidence_calibration_rubric():
     messages = CLASSIFY_PROMPT.format_messages(
         customer_name="Eve", subject="Late order", body="Where is my order?"
