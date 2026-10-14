@@ -5,9 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { TriageStreamState } from "@/hooks/use-triage-stream";
 import { formatTimestamp } from "@/lib/format";
-import { aiRoute, buildAuditDiff, finalRoute } from "@/lib/review";
 import type { Ticket } from "@/lib/types";
-import { AuditDiff } from "./audit-diff";
 import { StatusChip } from "./status-chip";
 import { TriagePipeline } from "./triage-pipeline";
 
@@ -38,8 +36,6 @@ export function TicketDetail({ ticket, isLoading, stream, isRunning, onTriage }:
 
   const live = stream?.ticketId === ticket.id ? stream : null;
   const canTriage = ticket.status === "new" || ticket.status === "triaged";
-  const reviewed = ticket.triage ? finalRoute(ticket.triage) : null;
-  const overrides = ticket.triage && reviewed ? buildAuditDiff(aiRoute(ticket.triage), reviewed) : [];
 
   return (
     <section aria-label="Ticket" className="glass flex min-h-0 flex-col overflow-y-auto">
@@ -70,7 +66,6 @@ export function TicketDetail({ ticket, isLoading, stream, isRunning, onTriage }:
             {ticket.status === "new" ? "Run triage" : "Re-run triage"}
           </Button>
         )}
-        <AuditDiff changes={overrides} />
       </div>
     </section>
   );

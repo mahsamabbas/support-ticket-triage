@@ -12,6 +12,8 @@ Portfolio app 6 of 10. Scope: classify sample tickets, explain the suggested que
 - **Routing policy in code, not in the prompt.** Confidence below 0.6, or a queue that does not serve the category, sends the ticket to `Needs Manual Triage` with a flag. The draft then only asks the customer for details.
 - **Live pipeline over SSE.** Both steps animate in the UI with their timings.
 - **Human in control.** Category, urgency and queue are editable; Approve is blocked until the route is valid. Every change against the AI suggestion shows as an audit chip.
+- **Triage all new.** One click walks every new ticket through the pipeline with a progress bar, and stops if the model goes offline.
+- **Keyboard first.** Shortcuts for navigation, triage and review, plus a command palette to jump to any ticket or filter by queue.
 - **Prompt-injection guard.** Ticket text is fenced as data and the model is told never to follow it.
 
 | Live triage | Manual triage | Approved with overrides |
@@ -115,12 +117,25 @@ npm run dev
 - Triage NG-1009: a vague ticket that goes to `Needs Manual Triage`; the draft asks the customer for details.
 - Change a field (for example urgency) and approve to see the audit chips.
 - Create a ticket with "Triage immediately" checked.
+- Click **Triage all new** to run every new ticket in turn.
+
+#### Keyboard
+
+| Key | Action |
+| --- | --- |
+| `J` / `K` | Next / previous ticket |
+| `T` | Run triage on the selected ticket |
+| `A` | Approve draft |
+| `R` | Reject |
+| `⌘K` (macOS) / `Ctrl K` | Command palette: jump to a ticket, filter a queue, run an action |
+
+Letter shortcuts are ignored while typing in a field or when a dialog is open.
 
 ## Tests
 
 ```bash
 cd backend && .venv/bin/pytest -q    # 103 passed
-cd frontend && npm test              # 50 passed
+cd frontend && npm test              # 67 passed
 ```
 
 Normal case: a double-charge ticket is classified `billing` / `high` / `Billing Team` and the draft streams and saves.
