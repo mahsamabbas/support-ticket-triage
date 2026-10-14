@@ -28,7 +28,7 @@ Next.js UI (3005)  ──HTTP/SSE──▶  FastAPI (8005)  ──▶  LangChain
 
 - The browser talks only to FastAPI. It never calls Ollama.
 - Frontend: Next.js (App Router), TypeScript, Tailwind CSS, shadcn/ui, TanStack Query, zod, react-hook-form, framer-motion, sonner.
-- Backend: Python 3.12, FastAPI, Pydantic v2, pydantic-settings, `langchain-core`, `langchain-ollama`, sse-starlette, sqlite3.
+- Backend: Python 3.12, FastAPI, Pydantic v2, pydantic-settings, `langchain-core`, `langchain-ollama`, sqlite3. SSE uses FastAPI's `StreamingResponse` (no extra SSE library).
 - LLM: `qwen2.5:7b` via Ollama. Classify runs at temperature 0; draft at 0.3. `num_ctx` 8192.
 
 ## 3. Fixed taxonomy
@@ -139,7 +139,7 @@ On first start, when `tickets` is empty, the backend inserts these 10 tickets. E
 | POST | `/tickets` | Create ticket (`TicketCreate`) |
 | POST | `/tickets/{id}/triage` | Run the pipeline, stream SSE events |
 | POST | `/tickets/{id}/review` | `{action: approve \| reject, final_category, final_urgency, final_queue, final_draft, review_note?}` |
-| GET | `/stats` | Counts by status, open counts by queue, average confidence of triaged tickets |
+| GET | `/stats` | Counts by status, open (`triaged`) counts by queue, average confidence over every ticket that has a triage result |
 
 ### SSE events from `/triage`
 
@@ -223,12 +223,12 @@ support-ticket-triage/
 │   ├── scripts/eval_triage.py
 │   ├── requirements.txt, requirements-dev.txt, Dockerfile, .env.example
 ├── frontend/
-│   ├── app/                   # layout, page
-│   ├── components/            # inbox, ticket-detail, pipeline, decision-panel,
+│   ├── src/app/               # layout, page, providers, globals.css
+│   ├── src/components/        # inbox, ticket-detail, triage-pipeline, decision-panel,
 │   │                          # confidence-gauge, audit-diff, queue-lanes,
 │   │                          # new-ticket-dialog, command-palette, offline-banner, ui/
-│   ├── hooks/                 # use-triage-stream, use-hotkeys
-│   ├── lib/                   # api.ts, sse.ts, api-types.ts (generated), urgency.ts
+│   ├── src/hooks/             # use-triage-stream, use-hotkeys
+│   ├── src/lib/               # api.ts, sse.ts, api-types.ts (generated), urgency.ts, review.ts
 │   ├── Dockerfile, .env.example
 ├── docker-compose.yml
 ├── .github/workflows/ci.yml
