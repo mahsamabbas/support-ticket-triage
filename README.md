@@ -134,7 +134,7 @@ Letter shortcuts are ignored while typing in a field or when a dialog is open.
 ## Tests
 
 ```bash
-cd backend && .venv/bin/pytest -q    # 179 passed
+cd backend && .venv/bin/pytest -q    # 184 passed
 cd frontend && npm test              # 85 passed
 ```
 
@@ -143,24 +143,28 @@ Failure cases: low confidence, queue that does not fit the category, instruction
 
 ## Evaluation
 
-`backend/scripts/eval_triage.py` classifies the 10 seed tickets and two sets of 12 held-out tickets with the live model, applies the same policy and injection check as the API, and scores category, urgency and queue against expected labels (`cd backend && .venv/bin/python -m scripts.eval_triage --out ../docs/eval-results.md`).
+`backend/scripts/eval_triage.py` classifies the 10 seed tickets and three sets of 12 held-out tickets with the live model, applies the same policy and injection check as the API, and scores category, urgency and queue against expected labels (`cd backend && .venv/bin/python -m scripts.eval_triage --out ../docs/eval-results.md`).
 
-History: before the safeguards the seed queue score was 9/10 and held-out v1 9/12, with the v1 injection obeyed and both vague v1 tickets routed. The first run with the safeguards also routed on `concrete_issue` and scored seed 8/10, v1 7/12 and blind v2 6/12, because that rule alone sent 9 answerable tickets to manual triage. The rule was then dropped (the field is kept as a reasoning step) after seeing that v2 run, so v2 has now been run twice and is no longer fully blind.
+**Honest blind number** — held-out v3, written blind after the last prompt/policy change and run once (`qwen2.5:7b`, median classify 1461 ms):
 
-Latest run (`qwen2.5:7b`, median classify 1449 ms):
+- Held-out v3: Category 10/10 · Urgency 7/10 · Queue 11/12
+
+The v3 misses are three urgencies rated one level too low (two `critical` tickets rated `high`, one `high` rated `medium`) and one simple billing change sent to Customer Care instead of Billing Team. Its prompt-injection ticket was not caught by the regex detector, but the model labelled the real request correctly.
+
+Other sets in the same run:
 
 - Seed tickets (used while tuning the prompt): Category 8/8 · Urgency 7/8 · Queue 9/10
 - Held-out v1 (used to diagnose the fixes): Category 9/10 · Urgency 8/10 · Queue 11/12
-- Held-out v2 (written blind, second run): Category 8/10 · Urgency 9/10 · Queue 10/12
+- Held-out v2 (written blind, but now run twice; see below): Category 8/10 · Urgency 9/10 · Queue 10/12
 
-All six vague tickets now land in manual triage through low confidence, and the v1 injection ticket through the detector (the model itself still obeyed it). Remaining queue misses: one billing change sent to Customer Care instead of Billing Team, one account ticket labelled billing (caught as an inconsistent route), and one general shipping question sent to Logistics instead of Customer Care. Full table in [docs/eval-results.md](docs/eval-results.md).
+History: before the safeguards the seed queue score was 9/10 and held-out v1 9/12, with the v1 injection obeyed and both vague v1 tickets routed. The first run with the safeguards also routed on `concrete_issue` and scored seed 8/10, v1 7/12 and blind v2 6/12, because that rule alone sent 9 answerable tickets to manual triage. The rule was dropped after seeing that v2 run (the field is kept as a reasoning step), so v2 is no longer fully blind, which is why v3 was written. All eight vague tickets across the held-out and seed sets now land in manual triage through low confidence. Full tables in [docs/eval-results.md](docs/eval-results.md).
 
 ## Known limitations
 
 - 7B local model: labels and drafts vary between runs, and a draft can still slip past a prompt rule (for example implying a refund). The human review step is the safeguard.
 - Confidence is the model's self-reported score, steered by a rubric and examples in the prompt. It is not a calibrated probability.
 - Model-reported signals can be wrong: routing on `concrete_issue` sent many clear, simple questions to manual triage, so it is only used as a reasoning step.
-- The injection detector is a set of regular expressions. A paraphrased attack can get past it (the injection ticket in the blind held-out set did; the model happened to label it correctly anyway), and unusual but honest wording can trip it (it only ever sends a ticket to manual triage).
+- The injection detector is a set of regular expressions. A paraphrased attack can get past it (the injection tickets in both blind held-out sets did; the model happened to label them correctly anyway), and unusual but honest wording can trip it (it only ever sends a ticket to manual triage).
 - Single agent, no authentication.
 - The draft is not regenerated after the agent changes the classification.
 - SQLite file storage, no multi-user concurrency.

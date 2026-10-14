@@ -8,9 +8,11 @@ from app.schemas import PolicyResult
 from app.seed import SEED_TICKETS, SeedTicket
 from scripts.eval_cases import HELD_OUT_TICKETS
 from scripts.eval_cases_v2 import HELD_OUT_V2
+from scripts.eval_cases_v3 import HELD_OUT_V3
 from scripts.eval_triage import EVAL_SETS, HISTORY, Row, _score, render
 
-(SEED_TITLE, _), (V1_TITLE, _), (V2_TITLE, _) = EVAL_SETS
+HELD_OUT_SETS = [HELD_OUT_TICKETS, HELD_OUT_V2, HELD_OUT_V3]
+(SEED_TITLE, _), (V1_TITLE, _), (V2_TITLE, _), (V3_TITLE, _) = EVAL_SETS
 
 
 def seed(
@@ -76,30 +78,44 @@ def test_render_reports_every_set_with_scores_and_latency():
         Row(seed(ticket_id="EV-2"), result(queue=Queue.CUSTOMER_CARE), 10000),
     ]
     v2_rows = [Row(seed(ticket_id="HX-1"), result(), 4000)]
+    v3_rows = [Row(seed(ticket_id="QX-1"), result(queue=Queue.LOGISTICS), 4000)]
     report = render(
         "qwen2.5:7b",
         0.6,
         date(2026, 10, 14),
-        [(SEED_TITLE, seed_rows), (V1_TITLE, v1_rows), (V2_TITLE, v2_rows)],
+        [
+            (SEED_TITLE, seed_rows),
+            (V1_TITLE, v1_rows),
+            (V2_TITLE, v2_rows),
+            (V3_TITLE, v3_rows),
+        ],
     )
 
     assert "`qwen2.5:7b`" in report
     assert "threshold 0.6" in report
     assert "2026-10-14" in report
     assert "mean 4000 ms" in report
-    assert "median 3000 ms" in report
+    assert "median 3500 ms" in report
     history = "\n".join(HISTORY)
     assert history in report
     assert report.index(history) < report.index(f"## {SEED_TITLE}")
     seed_part = section(report, SEED_TITLE)
     v1_part = section(report, V1_TITLE)
     v2_part = section(report, V2_TITLE)
+    v3_part = section(report, V3_TITLE)
     assert "Category 1/1 · Urgency 1/1 · Queue 2/2" in seed_part
     assert "Category 2/2 · Urgency 1/2 · Queue 1/2" in v1_part
     assert "Category 1/1 · Urgency 1/1 · Queue 1/1" in v2_part
+    assert "Category 1/1 · Urgency 1/1 · Queue 0/1" in v3_part
     assert "| NG-2 | any / any / Needs Manual Triage |" in seed_part
     assert "| EV-1 |" in v1_part and "| EV-1 |" not in seed_part + v2_part
     assert "| HX-1 |" in v2_part
+    assert "| QX-1 |" in v3_part and "| QX-1 |" not in v2_part
+
+
+def test_eval_runs_v3_last_as_its_first_blind_run():
+    assert [tickets for _, tickets in EVAL_SETS] == [SEED_TICKETS, *HELD_OUT_SETS]
+    assert V3_TITLE == "Held-out v3 (written blind after the last change; first run)"
 
 
 def test_history_keeps_earlier_runs_and_discloses_the_second_v2_run():
@@ -108,6 +124,7 @@ def test_history_keeps_earlier_runs_and_discloses_the_second_v2_run():
     assert "(d263010): seed queue 8/10 · held-out v1 queue 7/12 · held-out v2 queue 6/12" in history
     assert "Held-out v2 has now been run twice" in history
     assert "decided after seeing the first v2 run" in history
+    assert "v3 was written blind after e913355 and has been run once" in history
 
 
 def test_render_marks_fallback_and_flagged_rows():
@@ -129,12 +146,20 @@ def test_render_marks_fallback_and_flagged_rows():
     assert "Queue 0/1" in section(report, SEED_TITLE)
 
 
-@pytest.mark.parametrize("tickets", [HELD_OUT_TICKETS, HELD_OUT_V2], ids=["v1", "v2"])
+@pytest.mark.parametrize("tickets", HELD_OUT_SETS, ids=["v1", "v2", "v3"])
 def test_held_out_sets_are_distinct_and_cover_every_queue(tickets):
     ids = [ticket.id for ticket in tickets]
     assert len(ids) == 12
     assert len(set(ids)) == 12
-    others = [SEED_TICKETS, HELD_OUT_TICKETS, HELD_OUT_V2]
+    others = [SEED_TICKETS, *HELD_OUT_SETS]
     other_ids = {t.id for group in others if group is not tickets for t in group}
     assert not set(ids) & other_ids
     assert {ticket.expected_queue for ticket in tickets} == set(Queue)
+
+
+@pytest.mark.parametrize("tickets", HELD_OUT_SETS, ids=["v1", "v2", "v3"])
+def test_manual_triage_cases_leave_category_and_urgency_unscored(tickets):
+    manual = [ticket for ticket in tickets if ticket.expected_queue == Queue.MANUAL_TRIAGE]
+    assert manual
+    for ticket in manual:
+        assert (ticket.expected_category, ticket.expected_urgency) == (None, None), ticket.id
