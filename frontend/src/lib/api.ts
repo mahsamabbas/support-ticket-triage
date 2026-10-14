@@ -27,7 +27,14 @@ export class ApiError extends Error {
 
 type ValidationItem = { loc: (string | number)[]; msg: string };
 
+const NETWORK_ERROR_MESSAGE = "Can't reach the QueueWise API. Is the backend running on port 8005?";
+
+function validationMessage(msg: string) {
+  return msg.replace(/^Value error, /, "");
+}
+
 export async function toApiError(response: Response): Promise<ApiError> {
+  const fallback = `Request failed with status ${response.status}.`;
   let body: unknown = null;
   try {
     body = await response.json();
@@ -36,24 +43,38 @@ export async function toApiError(response: Response): Promise<ApiError> {
   }
   const detail = (body as { detail?: unknown } | null)?.detail;
   if (Array.isArray(detail)) {
+    const items = detail as ValidationItem[];
     const fields: Record<string, string> = {};
-    for (const item of detail as ValidationItem[]) {
-      fields[String(item.loc.at(-1) ?? "body")] = item.msg;
+    let message = "Some fields are invalid.";
+    for (const item of items) {
+      const key = item.loc.slice(1).join(".");
+      if (key) fields[key] = validationMessage(item.msg);
+      else message = validationMessage(item.msg);
     }
-    return new ApiError(response.status, "validation_error", "Some fields are invalid.", fields);
+    if (items.length === 1) message = validationMessage(items[0].msg);
+    return new ApiError(response.status, "validation_error", message || fallback, fields);
+  }
+  if (typeof detail === "string" && detail) {
+    return new ApiError(response.status, "http_error", detail);
   }
   if (detail && typeof detail === "object" && "code" in detail) {
-    const { code, message } = detail as { code: string; message: string };
-    return new ApiError(response.status, code, message);
+    const { code, message } = detail as { code: string; message?: string };
+    return new ApiError(response.status, code, message || fallback);
   }
-  return new ApiError(response.status, "http_error", `Request failed with status ${response.status}.`);
+  return new ApiError(response.status, "http_error", fallback);
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
-  });
+  const headers = new Headers(init?.headers);
+  if (init?.body != null && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, { ...init, headers });
+  } catch {
+    throw new ApiError(0, "network_error", NETWORK_ERROR_MESSAGE);
+  }
   if (!response.ok) throw await toApiError(response);
   return (await response.json()) as T;
 }
