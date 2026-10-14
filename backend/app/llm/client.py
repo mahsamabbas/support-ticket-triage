@@ -23,14 +23,18 @@ class LLMProvider(Protocol):
 
 
 class OllamaProvider:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(
+        self, settings: Settings, *, transport: httpx.AsyncBaseTransport | None = None
+    ) -> None:
         self._settings = settings
+        self._base_url = settings.ollama_base_url.rstrip("/")
+        self._transport = transport
         self.model_name = settings.ollama_model
 
     def _chat(self, **options) -> ChatOllama:
         return ChatOllama(
             model=self._settings.ollama_model,
-            base_url=self._settings.ollama_base_url,
+            base_url=self._base_url,
             num_ctx=self._settings.num_ctx,
             client_kwargs={"timeout": self._settings.llm_timeout_seconds},
             **options,
@@ -44,10 +48,12 @@ class OllamaProvider:
 
     async def health(self) -> tuple[bool, bool]:
         try:
-            async with httpx.AsyncClient(timeout=HEALTH_TIMEOUT_SECONDS) as client:
-                response = await client.get(f"{self._settings.ollama_base_url}/api/tags")
+            async with httpx.AsyncClient(
+                timeout=HEALTH_TIMEOUT_SECONDS, transport=self._transport
+            ) as client:
+                response = await client.get(f"{self._base_url}/api/tags")
                 response.raise_for_status()
-        except httpx.HTTPError:
+            names = {model.get("name", "") for model in response.json().get("models", [])}
+        except (httpx.HTTPError, ValueError, AttributeError, TypeError):
             return False, False
-        names = {model.get("name", "") for model in response.json().get("models", [])}
         return True, self.model_name in names or f"{self.model_name}:latest" in names

@@ -68,12 +68,12 @@ DRAFT_PROMPT = ChatPromptTemplate.from_messages(
 
 ROUTED_INSTRUCTION = (
     "Routing decision: category {category}, urgency {urgency}, queue {queue}. "
-    "Write a reply that acknowledges the issue and tells the customer the {queue} team is "
+    "Write a reply that acknowledges the issue and tells the customer that {queue} is "
     "handling it."
 )
 
 CLARIFY_INSTRUCTION = (
-    "This ticket is too unclear to route. Write a short reply that only asks for the details "
+    "This ticket is too unclear to route. Write a reply that only asks for the details "
     "needed to help, such as order number, product, what happened and when. Do not guess the "
     "problem and do not mention internal queues."
 )
