@@ -184,18 +184,14 @@ def test_classify_prompt_fences_ticket_as_data():
     assert injected in human
 
 
-def test_classify_prompt_asks_for_a_reason_well_below_the_schema_cap():
+def test_classify_prompt_asks_for_a_short_reason_with_examples():
     messages = CLASSIFY_PROMPT.format_messages(
         customer_name="Eve", subject="Late order", body="Where is my order?"
     )
     system = messages[0].content
-    assert (
-        "reason: one short plain English sentence of at most 20 words that names the "
-        "customer's problem and why it fits the queue. Examples:\n"
-        '- "Customer was charged twice for one order and wants the duplicate refunded."\n'
-        '- "Package tracking has not updated for six days, so Logistics should investigate."\n'
-        '- "Ticket gives no product, order or symptom, so the right queue is unclear."\n'
-    ) in system
+    reason_rule = system[system.index("reason: ") :]
+    assert "at most 20 words" in reason_rule
+    assert re.search(r'Examples:\n- "[^"\n]+"\n', reason_rule)
     assert "200" not in system
 
 

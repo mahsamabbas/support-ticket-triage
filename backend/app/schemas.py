@@ -6,10 +6,11 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.domain.taxonomy import Category, Flag, Queue, RoutableQueue, TicketStatus, Urgency
 
-# CJK punctuation, kana, ideographs, Hangul and fullwidth forms. qwen2.5 sometimes drifts into
-# Chinese mid-sentence; accented Latin stays allowed.
+# Hangul Jamo, CJK punctuation through ideographs, Hangul syllables, compatibility ideographs,
+# fullwidth forms and ideograph extensions B-G. qwen2.5 sometimes drifts into Chinese
+# mid-sentence; accented Latin stays allowed.
 _CJK_OR_FULLWIDTH = re.compile(
-    "[\u3000-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uff00-\uffef]"
+    "[\u1100-\u11ff\u3000-\u9fff\uac00-\ud7af\uf900-\ufaff\uff00-\uffef\U00020000-\U0003134f]"
 )
 
 

@@ -77,8 +77,18 @@ def test_model_cannot_pick_manual_queue():
 
 @pytest.mark.parametrize(
     "leak",
-    ["欺诈", "アカウント", "계정", "\u3000", "\uff01", "\u3400"],
-    ids=["han", "katakana", "hangul", "ideographic-space", "fullwidth", "cjk-ext-a"],
+    ["欺诈", "アカウント", "계정", "\u3000", "\uff01", "\u3400", "\uf900", "\U00020000", "\u1100"],
+    ids=[
+        "han",
+        "katakana",
+        "hangul",
+        "ideographic-space",
+        "fullwidth",
+        "cjk-ext-a",
+        "compat-ideograph",
+        "cjk-ext-b",
+        "hangul-jamo",
+    ],
 )
 def test_reason_rejects_cjk_and_fullwidth_text(leak):
     with pytest.raises(ValidationError, match="reason must be plain English text"):

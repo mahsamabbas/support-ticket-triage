@@ -88,7 +88,7 @@ Reset demo data: `docker compose down -v`
 Environment="OLLAMA_HOST=0.0.0.0"
 ```
 
-Then `sudo systemctl restart ollama`. Your firewall must also allow traffic from the Docker bridge to port 11434.
+Then `sudo systemctl restart ollama`. Your firewall must also allow traffic from the Docker bridge to port 11434. Note that `OLLAMA_HOST=0.0.0.0` exposes the unauthenticated Ollama API on every interface; prefer binding to the Docker bridge IP instead (for example `OLLAMA_HOST=172.17.0.1`), or firewall port 11434 from other networks.
 
 ### Local
 
@@ -119,12 +119,12 @@ npm run dev
 ## Tests
 
 ```bash
-cd backend && .venv/bin/pytest -q    # 100 passed
+cd backend && .venv/bin/pytest -q    # 103 passed
 cd frontend && npm test              # 50 passed
 ```
 
 Normal case: a double-charge ticket is classified `billing` / `high` / `Billing Team` and the draft streams and saves.
-Failure cases: low confidence, queue that does not fit the category, broken model JSON (repair then fallback), non-English text in the reason (repair), model picking the manual queue, empty or oversized tickets, Ollama down (503), draft failing mid-stream, approving twice (409), approving into manual triage or a wrong queue (422).
+Failure cases: low confidence, queue that does not fit the category, broken model JSON (repair then fallback), Chinese/Japanese/Korean text in the reason (repair, then manual-triage fallback), model picking the manual queue, empty or oversized tickets, Ollama down (503), draft failing mid-stream, approving twice (409), approving into manual triage or a wrong queue (422).
 
 ## Known limitations
 
