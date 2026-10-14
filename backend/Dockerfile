@@ -6,11 +6,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
+RUN useradd --create-home app && mkdir -p /app/data && chown app:app /app/data
+
 COPY requirements.txt .
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN pip install -r requirements.txt
 
 COPY app ./app
-RUN useradd --create-home app && mkdir -p /app/data && chown app:app /app/data
 
 USER app
 

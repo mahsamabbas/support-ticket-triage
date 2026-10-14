@@ -1,9 +1,16 @@
+import re
 from enum import StrEnum
 from typing import Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.domain.taxonomy import Category, Flag, Queue, RoutableQueue, TicketStatus, Urgency
+
+# CJK punctuation, kana, ideographs, Hangul and fullwidth forms. qwen2.5 sometimes drifts into
+# Chinese mid-sentence; accented Latin stays allowed.
+_CJK_OR_FULLWIDTH = re.compile(
+    "[\u3000-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uff00-\uffef]"
+)
 
 
 class TicketText(Protocol):
@@ -26,8 +33,15 @@ class ClassificationOut(BaseModel):
     category: Category
     urgency: Urgency
     queue: RoutableQueue
-    reason: str = Field(min_length=1, max_length=280)
+    reason: str = Field(min_length=1, max_length=200)
     confidence: float = Field(ge=0, le=1)
+
+    @field_validator("reason")
+    @classmethod
+    def reason_is_english(cls, value: str) -> str:
+        if _CJK_OR_FULLWIDTH.search(value):
+            raise ValueError("reason must be plain English text")
+        return value
 
 
 class PolicyResult(BaseModel):

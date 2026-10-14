@@ -57,6 +57,14 @@ async def test_classify_repairs_once():
     assert result.urgency == Urgency.LOW
 
 
+async def test_classify_repairs_non_english_reason():
+    leaked = classification_json(reason="Account takeover risk, prevent potential欺诈")
+    llm = FakeListChatModel(responses=[leaked, classification_json()])
+    result = await classify(llm, TICKET)
+    assert result is not None
+    assert result.reason == "Duplicate card charge on order #4521 needs a refund review."
+
+
 async def test_classify_returns_none_after_failed_repair():
     llm = FakeListChatModel(responses=["nope", classification_json(queue="Warehouse")])
     assert await classify(llm, TICKET) is None
@@ -181,8 +189,15 @@ def test_classify_prompt_asks_for_a_reason_well_below_the_schema_cap():
         customer_name="Eve", subject="Late order", body="Where is my order?"
     )
     system = messages[0].content
-    assert "reason: one plain sentence, under 160 characters" in system
-    assert "280" not in system
+    assert "reason: one plain English sentence, under 160 characters" in system
+    assert "200" not in system
+
+
+def test_draft_prompt_requires_english():
+    messages = DRAFT_PROMPT.format_messages(
+        instruction="Reply.", customer_name="Eve", subject="Late order", body="Where is my order?"
+    )
+    assert "Write in English only." in messages[0].content
 
 
 def test_classify_prompt_keeps_the_confidence_calibration_rubric():

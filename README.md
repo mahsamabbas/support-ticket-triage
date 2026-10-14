@@ -77,9 +77,22 @@ docker compose up --build
 
 UI http://localhost:3005 · API http://localhost:8005/docs
 
+Optional: `cp .env.example .env` to change ports or the model, then `docker compose up --build`.
+
 Reset demo data: `docker compose down -v`
 
+**Linux:** the backend container reaches Ollama through the Docker bridge gateway, but a default Ollama install listens only on 127.0.0.1. Start it with `OLLAMA_HOST=0.0.0.0 ollama serve`, or for the systemd service run `sudo systemctl edit ollama` and add:
+
+```ini
+[Service]
+Environment="OLLAMA_HOST=0.0.0.0"
+```
+
+Then `sudo systemctl restart ollama`. Your firewall must also allow traffic from the Docker bridge to port 11434.
+
 ### Local
+
+Prerequisites: Python 3.12, Node 22 and Ollama.
 
 ```bash
 # backend
@@ -106,12 +119,12 @@ npm run dev
 ## Tests
 
 ```bash
-cd backend && .venv/bin/pytest -q    # 90 passed
+cd backend && .venv/bin/pytest -q    # 100 passed
 cd frontend && npm test              # 50 passed
 ```
 
 Normal case: a double-charge ticket is classified `billing` / `high` / `Billing Team` and the draft streams and saves.
-Failure cases: low confidence, queue that does not fit the category, broken model JSON (repair then fallback), model picking the manual queue, empty or oversized tickets, Ollama down (503), draft failing mid-stream, approving twice (409), approving into manual triage or a wrong queue (422).
+Failure cases: low confidence, queue that does not fit the category, broken model JSON (repair then fallback), non-English text in the reason (repair), model picking the manual queue, empty or oversized tickets, Ollama down (503), draft failing mid-stream, approving twice (409), approving into manual triage or a wrong queue (422).
 
 ## Known limitations
 
@@ -122,10 +135,11 @@ Failure cases: low confidence, queue that does not fit the category, broken mode
 - SQLite file storage, no multi-user concurrency.
 - Drafts are never sent; there is no helpdesk or email integration.
 - Docker reaches Ollama on the host via host.docker.internal; the model is not containerised.
+- Python dependencies use minimum versions (`>=`), not a lock file, so Docker builds can pick up newer releases.
 
 ## References
 
-- [LangChain Ollama integration](https://python.langchain.com/docs/integrations/chat/ollama/)
+- [LangChain Ollama integration](https://docs.langchain.com/oss/python/integrations/chat/ollama)
 - [Ollama structured outputs](https://ollama.com/blog/structured-outputs)
 - [shadcn/ui](https://ui.shadcn.com) components (copied into `frontend/src/components/ui`)
 - Built with Cursor; all code reviewed, run and tested locally.

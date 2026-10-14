@@ -40,7 +40,7 @@ Calibration examples (not real tickets):
 - "My order arrived with a cracked screen, order #881" -> confidence 0.9
 - "hello?? still waiting, please fix" -> confidence 0.25, nothing says what is wrong
 - "the app thing is acting up again" -> confidence 0.35, no product, symptom or account detail
-reason: one plain sentence, under 160 characters, explaining the queue choice.
+reason: one plain English sentence, under 160 characters, explaining the queue choice.
 
 {INJECTION_RULE}
 Reply with JSON only."""
@@ -62,6 +62,7 @@ DRAFT_SYSTEM = f"""You write reply drafts for NovaGear customer support agents. 
 reviews and edits every draft before anything is sent.
 Rules:
 - Plain text only, 60 to 140 words, warm and professional.
+- Write in English only.
 - Greet the customer by first name.
 - Never promise refunds, replacements, compensation or delivery dates.
 - Never invent order details, policies or facts that are not in the ticket.

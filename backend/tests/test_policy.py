@@ -75,6 +75,26 @@ def test_model_cannot_pick_manual_queue():
         make(queue="Needs Manual Triage")
 
 
+@pytest.mark.parametrize(
+    "leak",
+    ["欺诈", "アカウント", "계정", "\u3000", "\uff01", "\u3400"],
+    ids=["han", "katakana", "hangul", "ideographic-space", "fullwidth", "cjk-ext-a"],
+)
+def test_reason_rejects_cjk_and_fullwidth_text(leak):
+    with pytest.raises(ValidationError, match="reason must be plain English text"):
+        make(reason=f"Suspicious access needs action to prevent potential{leak}")
+
+
+def test_reason_allows_accented_latin_text():
+    assert make(reason="Jón reports a café order charged twice; refund review needed.").reason
+
+
+def test_reason_is_capped_at_200_characters():
+    assert make(reason="x" * 200)
+    with pytest.raises(ValidationError):
+        make(reason="x" * 201)
+
+
 def test_ticket_create_strips_and_validates_lengths():
     ticket = TicketCreate(
         customer_name="  Sara  ", subject="Refund please", body="Charged twice today."
