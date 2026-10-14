@@ -2,7 +2,7 @@
 
 import { Check, Loader2, X } from "lucide-react";
 import { motion } from "motion/react";
-import type { StepView, TriageStreamState } from "@/hooks/use-triage-stream";
+import type { StepState, StepView, TriageStreamState } from "@/hooks/use-triage-stream";
 import { formatMs } from "@/lib/format";
 import type { Ticket } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -17,18 +17,19 @@ function resolveStep(live: StepView | undefined, savedMs: number | undefined): S
 
 export function TriagePipeline({ ticket, stream }: { ticket: Ticket; stream: TriageStreamState | null }) {
   const saved = ticket.triage;
+  const live = stream?.ticketId === ticket.id ? stream : null;
   const steps: Step[] = [
     {
       key: "classify",
       title: "Classify",
       detail: "Category, urgency, queue and confidence as validated JSON",
-      ...resolveStep(stream?.classify, saved?.classify_ms),
+      ...resolveStep(live?.classify, saved?.classify_ms),
     },
     {
       key: "draft",
       title: "Draft",
       detail: "Reply written from the routing decision, streamed live",
-      ...resolveStep(stream?.draft, saved?.draft_ms),
+      ...resolveStep(live?.draft, saved?.draft_ms),
     },
   ];
   return (
@@ -39,34 +40,47 @@ export function TriagePipeline({ ticket, stream }: { ticket: Ticket; stream: Tri
         </h3>
         {saved && <span className="font-mono text-[11px] text-muted-foreground">{saved.model}</span>}
       </div>
-      <ol className="flex flex-col gap-3">
+      <ol aria-live="polite" className="flex flex-col gap-3">
         {steps.map((step, index) => (
           <PipelineStep key={step.key} step={step} index={index + 1} />
         ))}
       </ol>
-      {stream?.error && (
+      {live?.error && (
         <p role="alert" className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {stream.error.message}
+          {live.error.message}
         </p>
       )}
     </div>
   );
 }
 
+const STATUS_TEXT: Record<StepState, string> = {
+  idle: "not started",
+  running: "running",
+  done: "done",
+  error: "failed",
+};
+
 function PipelineStep({ step, index }: { step: Step; index: number }) {
   const marker = {
     idle: <span>{index}</span>,
-    running: <Loader2 className="size-3.5 animate-spin" />,
+    running: <Loader2 className="size-3.5 motion-safe:animate-spin" />,
     done: <Check className="size-3.5" />,
     error: <X className="size-3.5" />,
   }[step.state];
   let timing = "";
   if (step.state === "running") timing = "running…";
   else if (step.ms !== undefined) timing = formatMs(step.ms);
+  const status =
+    step.state === "done" && step.ms !== undefined ? `done, ${formatMs(step.ms)}` : STATUS_TEXT[step.state];
   return (
     <li className="flex items-center gap-3">
+      <span className="sr-only">
+        {step.title}: {status}
+      </span>
       <motion.span
         layout
+        aria-hidden
         className={cn(
           "grid size-7 place-items-center rounded-full border font-mono text-xs",
           step.state === "idle" && "text-muted-foreground",
@@ -78,10 +92,14 @@ function PipelineStep({ step, index }: { step: Step; index: number }) {
         {marker}
       </motion.span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium">{step.title}</p>
+        <p aria-hidden className="text-sm font-medium">
+          {step.title}
+        </p>
         <p className="text-xs text-muted-foreground">{step.detail}</p>
       </div>
-      <span className="font-mono text-xs tabular-nums text-muted-foreground">{timing}</span>
+      <span aria-hidden className="font-mono text-xs tabular-nums text-muted-foreground">
+        {timing}
+      </span>
     </li>
   );
 }

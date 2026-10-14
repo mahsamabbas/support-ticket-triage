@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { createSseParser, type SseMessage } from "./sse";
+import { describe, expect, it, vi } from "vitest";
+import { createSseParser, readSse, type SseMessage } from "./sse";
 
 function collect() {
   const messages: SseMessage[] = [];
@@ -33,5 +33,24 @@ describe("createSseParser", () => {
     const { messages, parser } = collect();
     parser.push(": keep-alive\n\n");
     expect(messages).toEqual([]);
+  });
+});
+
+describe("readSse", () => {
+  it("cancels the body stream when the message handler throws", async () => {
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode("event: a\ndata: 1\n\n"));
+      },
+      cancel,
+    });
+    const failure = new Error("handler failed");
+    await expect(
+      readSse(new Response(body), () => {
+        throw failure;
+      }),
+    ).rejects.toBe(failure);
+    await vi.waitFor(() => expect(cancel).toHaveBeenCalled());
   });
 });

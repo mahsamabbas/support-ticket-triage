@@ -12,7 +12,7 @@ export function AuditDiff({ changes, title = "Agent overrides" }: Props) {
         {changes.map((change) => (
           <li
             key={change.field}
-            className="flex items-center gap-1.5 rounded-full border border-urgency-high/30 bg-urgency-high/10 px-2.5 py-1 font-mono text-[11px]"
+            className="flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 font-mono text-[11px]"
           >
             <span className="text-muted-foreground">{change.field}</span>
             <span className="line-through decoration-muted-foreground/60">AI: {change.ai}</span>

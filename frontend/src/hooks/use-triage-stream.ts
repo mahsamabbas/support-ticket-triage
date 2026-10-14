@@ -1,112 +1,69 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useRef, useState } from "react";
-import { api, toApiError } from "@/lib/api";
+import { useCallback, useEffect, useReducer, useRef } from "react";
 import { queryKeys, useTicketCacheSync } from "@/lib/queries";
-import { readSse } from "@/lib/sse";
-import type { Classified, Ticket } from "@/lib/types";
+import {
+  BUSY,
+  IDLE_TRIAGE,
+  runTriageStream,
+  triageReducer,
+  type TriageAction,
+  type TriageOutcome,
+} from "@/lib/triage-stream";
 
-export type StepState = "idle" | "running" | "done" | "error";
-export type StepView = { state: StepState; ms?: number };
-export type TriageError = { code: string; message: string };
-export type TriageOutcome = { ok: true; ticket: Ticket } | { ok: false; error: TriageError };
+export type {
+  StepState,
+  StepView,
+  TriageError,
+  TriageOutcome,
+  TriageStreamState,
+} from "@/lib/triage-stream";
 
-export type TriageStreamState = {
-  ticketId: string | null;
-  classify: StepView;
-  draft: StepView;
-  classified: Classified | null;
-  draftText: string;
-  error: TriageError | null;
-};
-
-type StepEvent = { name: "classify" | "draft"; state: "started" | "done"; ms?: number };
-
-const IDLE: TriageStreamState = {
-  ticketId: null,
-  classify: { state: "idle" },
-  draft: { state: "idle" },
-  classified: null,
-  draftText: "",
-  error: null,
-};
-
-const BUSY: TriageOutcome = {
-  ok: false,
-  error: { code: "busy", message: "Another triage is still running." },
-};
-
-function failRunningSteps(state: TriageStreamState, error: TriageError): TriageStreamState {
-  const fail = (step: StepView): StepView => (step.state === "running" ? { state: "error" } : step);
-  return { ...state, error, classify: fail(state.classify), draft: fail(state.draft) };
-}
-
-function applyStep(state: TriageStreamState, step: StepEvent): TriageStreamState {
-  const view: StepView = { state: step.state === "started" ? "running" : "done", ms: step.ms };
-  return step.name === "classify" ? { ...state, classify: view } : { ...state, draft: view };
-}
+const STALE_TICKET_CODES = new Set(["invalid_state", "not_found"]);
 
 export function useTriageStream() {
-  const [state, setState] = useState<TriageStreamState>(IDLE);
-  const running = useRef(false);
+  const [state, dispatch] = useReducer(triageReducer, IDLE_TRIAGE);
+  const controller = useRef<AbortController | null>(null);
   const queryClient = useQueryClient();
   const sync = useTicketCacheSync();
 
+  useEffect(() => () => controller.current?.abort(), []);
+
   const start = useCallback(
     async (ticketId: string): Promise<TriageOutcome> => {
-      if (running.current) return BUSY;
-      running.current = true;
-      setState({ ...IDLE, ticketId, classify: { state: "running" } });
-      const outcome: { value: TriageOutcome | null } = { value: null };
-      const fail = (error: TriageError) => {
-        outcome.value = { ok: false, error };
-        setState((current) => failRunningSteps(current, error));
+      if (controller.current) return BUSY;
+      const run = new AbortController();
+      controller.current = run;
+      const handle = (action: TriageAction) => {
+        if (action.type === "done") sync(action.ticket);
+        dispatch(action);
       };
-
       try {
-        const response = await fetch(api.triageUrl(ticketId), { method: "POST" });
-        if (!response.ok) {
-          const error = await toApiError(response);
-          if (error.code === "llm_unavailable") {
+        const outcome = await runTriageStream(ticketId, { signal: run.signal, dispatch: handle });
+        if (!outcome.ok) {
+          if (outcome.error.code === "llm_unavailable") {
             void queryClient.invalidateQueries({ queryKey: queryKeys.health });
           }
-          fail({ code: error.code, message: error.message });
-        } else {
-          await readSse(response, ({ event, data }) => {
-            const payload: unknown = JSON.parse(data);
-            if (event === "step") {
-              setState((current) => applyStep(current, payload as StepEvent));
-            } else if (event === "classified") {
-              setState((current) => ({ ...current, classified: payload as Classified }));
-            } else if (event === "draft_token") {
-              const { text } = payload as { text: string };
-              setState((current) => ({ ...current, draftText: current.draftText + text }));
-            } else if (event === "done") {
-              const ticket = payload as Ticket;
-              outcome.value = { ok: true, ticket };
-              sync(ticket);
-            } else if (event === "error") {
-              fail(payload as TriageError);
-            }
-          });
+          if (STALE_TICKET_CODES.has(outcome.error.code)) {
+            void queryClient.invalidateQueries({ queryKey: queryKeys.ticket(ticketId) });
+            void queryClient.invalidateQueries({ queryKey: ["tickets"] });
+            void queryClient.invalidateQueries({ queryKey: queryKeys.stats });
+          }
         }
-      } catch {
-        fail({ code: "network_error", message: "Lost connection to the QueueWise API." });
+        return outcome;
       } finally {
-        running.current = false;
+        if (controller.current === run) controller.current = null;
       }
-      return (
-        outcome.value ?? {
-          ok: false,
-          error: { code: "incomplete", message: "The triage stream ended early." },
-        }
-      );
     },
     [queryClient, sync],
   );
 
-  const reset = useCallback(() => setState(IDLE), []);
-  const isRunning = state.classify.state === "running" || state.draft.state === "running";
-  return { state, start, reset, isRunning };
+  const reset = useCallback(() => {
+    controller.current?.abort();
+    controller.current = null;
+    dispatch({ type: "reset" });
+  }, []);
+
+  return { state, start, reset, isRunning: state.running };
 }

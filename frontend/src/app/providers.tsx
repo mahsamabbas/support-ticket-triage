@@ -1,6 +1,7 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MotionConfig } from "motion/react";
 import { useState, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -13,7 +14,7 @@ export function Providers({ children }: { children: ReactNode }) {
   );
   return (
     <QueryClientProvider client={queryClient}>
-      {children}
+      <MotionConfig reducedMotion="user">{children}</MotionConfig>
       <Toaster theme="dark" position="bottom-right" richColors />
     </QueryClientProvider>
   );

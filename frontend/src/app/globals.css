@@ -100,7 +100,7 @@
   }
 }
 
-.pulse-critical {
+@utility pulse-critical {
   animation: signal-pulse 1.6s ease-out infinite;
 }
 

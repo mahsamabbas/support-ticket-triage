@@ -42,15 +42,14 @@ export function Inbox({
         <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Inbox</h2>
         <span className="font-mono text-xs text-muted-foreground">{tickets.length}</span>
       </header>
-      <div role="tablist" aria-label="Status filter" className="flex gap-1 px-3 pb-3">
+      <div role="group" aria-label="Status filter" className="flex gap-1 px-3 pb-3">
         {STATUS_TABS.map((tab) => {
           const active = filters.status === tab.value;
           return (
             <button
               key={tab.label}
               type="button"
-              role="tab"
-              aria-selected={active}
+              aria-pressed={active}
               onClick={() => onFiltersChange({ ...filters, status: tab.value })}
               className={cn(
                 "rounded-md px-2 py-1 text-xs transition-colors",
@@ -63,7 +62,7 @@ export function Inbox({
         })}
       </div>
       <ScrollArea className="min-h-0 flex-1">
-        <ul className="flex flex-col gap-1 px-2 pb-2">
+        <ul aria-busy={isLoading || undefined} className="flex flex-col gap-1 px-2 pb-2">
           {isLoading &&
             Array.from({ length: 6 }, (_, index) => (
               <li key={index}>
@@ -119,7 +118,7 @@ function InboxItem({ ticket, selected, streaming, onSelect }: InboxItemProps) {
             className={cn(
               "size-2 shrink-0 rounded-full",
               style ? style.dot : "bg-muted-foreground/30",
-              style?.pulse && "pulse-critical",
+              style?.pulse && "motion-safe:pulse-critical",
             )}
           />
           <span className="font-mono text-[11px] text-muted-foreground">{ticket.id}</span>

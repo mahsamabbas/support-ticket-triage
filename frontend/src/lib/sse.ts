@@ -33,9 +33,17 @@ export async function readSse(
   if (!response.body) throw new Error("The triage response has no body to stream.");
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
   const parser = createSseParser(onMessage);
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) return;
-    parser.push(value);
+  let finished = false;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) {
+        finished = true;
+        return;
+      }
+      parser.push(value);
+    }
+  } finally {
+    if (!finished) void reader.cancel().catch(() => undefined);
   }
 }

@@ -22,7 +22,7 @@ type Props = {
 export function TicketDetail({ ticket, isLoading, stream, isRunning, onTriage }: Props) {
   if (isLoading) {
     return (
-      <section className="glass flex flex-col gap-4 p-6">
+      <section aria-label="Loading ticket" aria-busy="true" className="glass flex flex-col gap-4 p-6">
         <Skeleton className="h-6 w-2/3" />
         <Skeleton className="h-32 w-full" />
       </section>
@@ -36,6 +36,7 @@ export function TicketDetail({ ticket, isLoading, stream, isRunning, onTriage }:
     );
   }
 
+  const live = stream?.ticketId === ticket.id ? stream : null;
   const canTriage = ticket.status === "new" || ticket.status === "triaged";
   const reviewed = ticket.triage ? finalRoute(ticket.triage) : null;
   const overrides = ticket.triage && reviewed ? buildAuditDiff(aiRoute(ticket.triage), reviewed) : [];
@@ -53,11 +54,11 @@ export function TicketDetail({ ticket, isLoading, stream, isRunning, onTriage }:
           </div>
           <h1 className="mt-1.5 text-xl font-semibold tracking-tight text-balance">{ticket.subject}</h1>
         </div>
-        <StatusChip status={ticket.status} streaming={isRunning && stream !== null} />
+        <StatusChip status={ticket.status} streaming={isRunning && live !== null} />
       </header>
       <div className="flex flex-col gap-6 px-6 py-5">
         <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/90">{ticket.body}</p>
-        <TriagePipeline ticket={ticket} stream={stream} />
+        <TriagePipeline ticket={ticket} stream={live} />
         {canTriage && (
           <Button
             onClick={() => onTriage(ticket.id)}
