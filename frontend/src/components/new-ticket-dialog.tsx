@@ -58,16 +58,21 @@ export function NewTicketDialog({ open, onOpenChange, onCreated }: Props) {
   } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: DEFAULTS });
   const body = useWatch({ control, name: "body" });
 
+  function close() {
+    reset(DEFAULTS);
+    onOpenChange(false);
+  }
+
   function handleOpenChange(next: boolean) {
-    if (!next) reset(DEFAULTS);
-    onOpenChange(next);
+    if (next) onOpenChange(true);
+    else if (!create.isPending) close();
   }
 
   const onSubmit = handleSubmit(async ({ triageNow, ...payload }) => {
     try {
       const ticket = await create.mutateAsync(payload);
       toast.success(`${ticket.id} created`);
-      handleOpenChange(false);
+      close();
       onCreated(ticket, triageNow);
     } catch (error) {
       if (error instanceof ApiError) {
@@ -88,13 +93,17 @@ export function NewTicketDialog({ open, onOpenChange, onCreated }: Props) {
         </DialogHeader>
         <form onSubmit={onSubmit} noValidate className="grid gap-4">
           <Field id="customer_name" label="Customer name" error={errors.customer_name?.message}>
-            <Input id="customer_name" {...errorProps("customer_name", errors.customer_name)} {...register("customer_name")} />
+            <Input
+              id="customer_name"
+              {...errorProps("customer_name", errors.customer_name?.message)}
+              {...register("customer_name")}
+            />
           </Field>
           <Field id="subject" label="Subject" error={errors.subject?.message}>
-            <Input id="subject" {...errorProps("subject", errors.subject)} {...register("subject")} />
+            <Input id="subject" {...errorProps("subject", errors.subject?.message)} {...register("subject")} />
           </Field>
           <Field id="body" label="Message" error={errors.body?.message} hint={`${body.length}/${BODY_MAX}`}>
-            <Textarea id="body" rows={6} {...errorProps("body", errors.body)} {...register("body")} />
+            <Textarea id="body" rows={6} {...errorProps("body", errors.body?.message)} {...register("body")} />
           </Field>
           <Controller
             control={control}
@@ -107,7 +116,7 @@ export function NewTicketDialog({ open, onOpenChange, onCreated }: Props) {
             )}
           />
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => handleOpenChange(false)}>
+            <Button type="button" variant="ghost" disabled={create.isPending} onClick={() => handleOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={create.isPending}>
@@ -124,8 +133,8 @@ function errorId(id: string) {
   return `${id}-error`;
 }
 
-function errorProps(id: TicketField, error: unknown) {
-  return error ? { "aria-invalid": true, "aria-describedby": errorId(id) } : { "aria-invalid": false };
+function errorProps(id: TicketField, message: string | undefined) {
+  return message ? { "aria-invalid": true, "aria-describedby": errorId(id) } : { "aria-invalid": false };
 }
 
 type FieldProps = { id: string; label: string; error?: string; hint?: string; children: ReactNode };

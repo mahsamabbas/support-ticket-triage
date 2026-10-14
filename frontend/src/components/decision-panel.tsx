@@ -168,6 +168,7 @@ function ReviewForm({ ticket, triage, taxonomy }: ReviewFormProps) {
           if (error instanceof ApiError && error.status === 409) {
             void queryClient.invalidateQueries({ queryKey: queryKeys.ticket(ticket.id) });
             void queryClient.invalidateQueries({ queryKey: ["tickets"] });
+            void queryClient.invalidateQueries({ queryKey: queryKeys.stats });
           }
         },
       },
@@ -292,6 +293,7 @@ function RouteSelect<T extends string>({ label, value, options, disabled, onChan
 function draftNote(status: TicketStatus, queue: string): string {
   if (status === "approved") return `Approved for the ${queue} queue. Nothing was sent to the customer.`;
   if (status === "rejected") return "Rejected. The AI decision was not used.";
+  if (queue === MANUAL_QUEUE) return "Nothing is sent. Pick a real queue to approve this draft.";
   return `Nothing is sent. Approving records this draft for the ${queue} queue.`;
 }
 
