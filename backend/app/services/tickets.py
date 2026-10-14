@@ -1,4 +1,4 @@
-from app.db import TicketRepository
+from app.db import TicketRepository, TicketStateChangedError
 from app.domain.taxonomy import Queue, TicketStatus, is_route_allowed
 from app.errors import InvalidRouteError, InvalidStateError, NotFoundError
 from app.schemas import ReviewAction, ReviewRequest, Ticket
@@ -18,7 +18,7 @@ def review_ticket(repo: TicketRepository, ticket_id: str, review: ReviewRequest)
             f"Ticket {ticket_id} is {ticket.status.value}; only triaged tickets can be reviewed."
         )
     if review.action == ReviewAction.REJECT:
-        return repo.save_review(ticket_id, review, TicketStatus.REJECTED)
+        return _save_review(repo, ticket_id, review, TicketStatus.REJECTED)
 
     category, queue = review.final_category, review.final_queue
     if category is None or queue is None:
@@ -27,4 +27,15 @@ def review_ticket(repo: TicketRepository, ticket_id: str, review: ReviewRequest)
         raise InvalidRouteError("Pick a real queue before approving; manual triage is not a team.")
     if not is_route_allowed(category, queue):
         raise InvalidRouteError(f"{queue.value} does not handle {category.value} tickets.")
-    return repo.save_review(ticket_id, review, TicketStatus.APPROVED)
+    return _save_review(repo, ticket_id, review, TicketStatus.APPROVED)
+
+
+def _save_review(
+    repo: TicketRepository, ticket_id: str, review: ReviewRequest, status: TicketStatus
+) -> Ticket:
+    try:
+        return repo.save_review(ticket_id, review, status)
+    except TicketStateChangedError as exc:
+        raise InvalidStateError(
+            f"Ticket {ticket_id} changed while you were reviewing it; reload and try again."
+        ) from exc

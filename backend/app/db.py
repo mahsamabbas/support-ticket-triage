@@ -229,7 +229,14 @@ class TicketRepository:
         return self._require(ticket_id)
 
     def save_review(self, ticket_id: str, review: ReviewRequest, status: TicketStatus) -> Ticket:
+        """Raise TicketStateChangedError, writing nothing, unless the ticket is triaged."""
         with self._connect() as conn:
+            updated = conn.execute(
+                "UPDATE tickets SET status = ? WHERE id = ? AND status = ?",
+                (status.value, ticket_id, TicketStatus.TRIAGED.value),
+            )
+            if updated.rowcount == 0:
+                raise TicketStateChangedError(ticket_id)
             conn.execute(
                 """
                 UPDATE triage_results SET
@@ -247,7 +254,6 @@ class TicketRepository:
                     ticket_id,
                 ),
             )
-            conn.execute("UPDATE tickets SET status = ? WHERE id = ?", (status.value, ticket_id))
         return self._require(ticket_id)
 
     def stats(self) -> StatsOut:

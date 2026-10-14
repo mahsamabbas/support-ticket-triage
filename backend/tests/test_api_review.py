@@ -58,8 +58,40 @@ def test_approve_twice_conflicts(client):
     assert response.json()["detail"]["code"] == "invalid_state"
 
 
+def test_reject_after_approve_conflicts(client):
+    triage(client)
+    client.post("/tickets/NG-1001/review", json=approve())
+    response = client.post("/tickets/NG-1001/review", json={"action": "reject"})
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "invalid_state"
+
+
+def test_review_that_loses_a_race_conflicts_and_writes_nothing(client, monkeypatch):
+    triage(client)
+    repo = client.app.state.repo
+    stale = repo.get("NG-1001")
+    approved = client.post("/tickets/NG-1001/review", json=approve()).json()
+    monkeypatch.setattr(repo, "get", lambda _ticket_id: stale)
+
+    response = client.post("/tickets/NG-1001/review", json={"action": "reject"})
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "invalid_state"
+    assert "changed while you were reviewing" in response.json()["detail"]["message"]
+    monkeypatch.undo()
+    assert client.get("/tickets/NG-1001").json() == approved
+
+
 def test_review_of_untriaged_ticket_conflicts(client):
-    assert client.post("/tickets/NG-1002/review", json=approve()).status_code == 409
+    response = client.post("/tickets/NG-1002/review", json=approve())
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "invalid_state"
+
+
+def test_review_of_unknown_ticket_is_not_found(client):
+    response = client.post("/tickets/NG-9999/review", json=approve())
+    assert response.status_code == 404
+    assert response.json()["detail"]["code"] == "not_found"
 
 
 def test_approve_with_manual_queue_is_rejected(client, provider):

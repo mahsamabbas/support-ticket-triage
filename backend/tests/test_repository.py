@@ -141,6 +141,43 @@ def test_save_review_records_final_fields(repo):
     assert [t.id for t in repo.list_tickets(queue=Queue.CUSTOMER_CARE)] == ["NG-1001"]
 
 
+def test_save_review_refuses_already_reviewed_ticket(repo):
+    seed_if_empty(repo)
+    repo.save_triage("NG-1001", policy(), "draft", "m", 1, 1)
+    approved = repo.save_review(
+        "NG-1001",
+        ReviewRequest(
+            action="approve",
+            final_category="billing",
+            final_urgency="high",
+            final_queue="Billing Team",
+            final_draft="first review",
+        ),
+        TicketStatus.APPROVED,
+    )
+
+    with pytest.raises(TicketStateChangedError):
+        repo.save_review(
+            "NG-1001",
+            ReviewRequest(action="reject", review_note="second review"),
+            TicketStatus.REJECTED,
+        )
+
+    assert repo.get("NG-1001") == approved
+
+
+def test_save_review_refuses_untriaged_ticket(repo):
+    seed_if_empty(repo)
+    before = repo.get("NG-1002")
+
+    with pytest.raises(TicketStateChangedError):
+        repo.save_review(
+            "NG-1002", ReviewRequest(action="reject", review_note="no"), TicketStatus.REJECTED
+        )
+
+    assert repo.get("NG-1002") == before
+
+
 def test_stats_counts(repo):
     seed_if_empty(repo)
     assert repo.stats().avg_confidence is None

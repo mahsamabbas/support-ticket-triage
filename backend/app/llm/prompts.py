@@ -31,7 +31,7 @@ Urgency guide:
 
 confidence is a number from 0 to 1. Use a value below 0.5 when the ticket is vague or is missing \
 the details needed to route it.
-reason is one or two sentences, at most 280 characters, explaining the queue choice.
+reason: one plain sentence, under 160 characters, explaining the queue choice.
 
 {INJECTION_RULE}
 Reply with JSON only."""

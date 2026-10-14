@@ -176,6 +176,15 @@ def test_classify_prompt_fences_ticket_as_data():
     assert injected in human
 
 
+def test_classify_prompt_asks_for_a_reason_well_below_the_schema_cap():
+    messages = CLASSIFY_PROMPT.format_messages(
+        customer_name="Eve", subject="Late order", body="Where is my order?"
+    )
+    system = messages[0].content
+    assert "reason: one plain sentence, under 160 characters" in system
+    assert "280" not in system
+
+
 def test_ollama_classifier_sends_json_schema_format():
     provider = OllamaProvider(Settings(_env_file=None))
     classifier = provider.classifier()
