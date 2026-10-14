@@ -15,8 +15,6 @@ def apply_policy(
         flags.append(Flag.LOW_CONFIDENCE)
     if not is_route_allowed(classification.category, queue):
         flags.append(Flag.INCONSISTENT_ROUTE)
-    if not classification.concrete_issue:
-        flags.append(Flag.MISSING_DETAILS)
     if injection_suspected:
         flags.append(Flag.POSSIBLE_INJECTION)
     return PolicyResult(

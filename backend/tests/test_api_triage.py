@@ -65,12 +65,11 @@ def test_low_confidence_goes_to_manual_triage(client, provider):
     assert done["triage"]["flags"] == ["low_confidence"]
 
 
-def test_missing_details_goes_to_manual_triage(client, provider):
+def test_concrete_issue_false_keeps_the_confident_route(client, provider):
     provider.classify_responses = [classification_json(concrete_issue=False)]
     classified = payload(triage(client), "classified")
-    assert classified["queue"] == "Needs Manual Triage"
-    assert classified["flags"] == ["missing_details"]
-    assert classified["confidence"] == 0.92
+    assert classified["queue"] == "Billing Team"
+    assert classified["flags"] == []
 
 
 @pytest.mark.parametrize(

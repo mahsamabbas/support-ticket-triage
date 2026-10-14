@@ -54,15 +54,19 @@ def test_both_flags_can_apply():
     assert result.flags == [Flag.LOW_CONFIDENCE, Flag.INCONSISTENT_ROUTE]
 
 
-def test_missing_details_routes_to_manual_triage_and_keeps_model_values():
+def test_concrete_issue_does_not_affect_routing():
     result = apply_policy(make(concrete_issue=False), threshold=0.6)
-    assert result.queue == Queue.MANUAL_TRIAGE
-    assert result.flags == [Flag.MISSING_DETAILS]
-    assert (result.category, result.urgency, result.confidence) == (
-        Category.BILLING,
-        Urgency.HIGH,
-        0.9,
-    )
+    assert result.queue == Queue.BILLING_TEAM
+    assert result.flags == []
+
+
+def test_flags_are_limited_to_policy_and_validation_outcomes():
+    assert {flag.value for flag in Flag} == {
+        "low_confidence",
+        "inconsistent_route",
+        "ai_output_invalid",
+        "possible_injection",
+    }
 
 
 def test_suspected_injection_routes_to_manual_triage_and_keeps_model_values():
@@ -86,7 +90,6 @@ def test_all_flags_can_apply_together():
     assert result.flags == [
         Flag.LOW_CONFIDENCE,
         Flag.INCONSISTENT_ROUTE,
-        Flag.MISSING_DETAILS,
         Flag.POSSIBLE_INJECTION,
     ]
     assert result.queue == Queue.MANUAL_TRIAGE

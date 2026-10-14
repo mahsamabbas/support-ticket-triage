@@ -9,7 +9,7 @@ Portfolio app 6 of 10. Scope: classify sample tickets, explain the suggested que
 ## What it does
 
 - **Two-step LangChain pipeline.** *Classify* returns JSON constrained by a JSON schema and validated by Pydantic (one repair retry). *Draft* streams the reply token by token.
-- **Routing policy in code, not in the prompt.** Confidence below 0.6, a queue that does not serve the category, or the model reporting that the ticket states no concrete problem (`concrete_issue: false`) sends the ticket to `Needs Manual Triage` with a flag. The draft then only asks the customer for details.
+- **Routing policy in code, not in the prompt.** Confidence below 0.6, a queue that does not serve the category, or instruction-like text caught by the injection detector sends the ticket to `Needs Manual Triage` with a flag. The draft then only asks the customer for details. The model also answers `concrete_issue` (does the ticket state an actionable problem?) just before scoring confidence; this steadies confidence on vague tickets but is not a routing rule.
 - **Live pipeline over SSE.** Both steps animate in the UI with their timings.
 - **Human in control.** Category, urgency and queue are editable; Approve is blocked until the route is valid. Every change against the AI suggestion shows as an audit chip.
 - **Triage all new.** One click walks every new ticket through the pipeline with a progress bar. **Stop** ends the run at any time, and it stops by itself if the model or API goes offline. You can keep browsing other tickets while it runs.
@@ -139,28 +139,28 @@ cd frontend && npm test              # 85 passed
 ```
 
 Normal case: a double-charge ticket is classified `billing` / `high` / `Billing Team` and the draft streams and saves.
-Failure cases: low confidence, queue that does not fit the category, no concrete problem described, instruction-like text in the subject or body, broken model JSON (repair then fallback), Chinese/Japanese/Korean text in the reason (repair, then manual-triage fallback), model picking the manual queue, empty or oversized tickets, Ollama down (503), draft failing mid-stream, approving twice (409), approving into manual triage or a wrong queue (422).
+Failure cases: low confidence, queue that does not fit the category, instruction-like text in the subject or body, broken model JSON (repair then fallback), Chinese/Japanese/Korean text in the reason (repair, then manual-triage fallback), model picking the manual queue, empty or oversized tickets, Ollama down (503), draft failing mid-stream, approving twice (409), approving into manual triage or a wrong queue (422).
 
 ## Evaluation
 
 `backend/scripts/eval_triage.py` classifies the 10 seed tickets and two sets of 12 held-out tickets with the live model, applies the same policy and injection check as the API, and scores category, urgency and queue against expected labels (`cd backend && .venv/bin/python -m scripts.eval_triage --out ../docs/eval-results.md`).
 
-Before the safeguards: Seed queue 9/10 · held-out v1 queue 9/12. The v1 prompt-injection ticket was routed as the injected text demanded and both vague v1 tickets were routed instead of sent to manual triage.
+History: before the safeguards the seed queue score was 9/10 and held-out v1 9/12, with the v1 injection obeyed and both vague v1 tickets routed. The first run with the safeguards also routed on `concrete_issue` and scored seed 8/10, v1 7/12 and blind v2 6/12, because that rule alone sent 9 answerable tickets to manual triage. The rule was then dropped (the field is kept as a reasoning step) after seeing that v2 run, so v2 has now been run twice and is no longer fully blind.
 
-After the safeguards (`qwen2.5:7b`, median classify 1440 ms):
+Latest run (`qwen2.5:7b`, median classify 1449 ms):
 
-- Seed tickets: Category 8/8 · Urgency 7/8 · Queue 8/10
-- Held-out v1 (used to diagnose the fixes): Category 9/10 · Urgency 8/10 · Queue 7/12
-- Held-out v2 (written blind, run once): Category 8/10 · Urgency 9/10 · Queue 6/12
+- Seed tickets (used while tuning the prompt): Category 8/8 · Urgency 7/8 · Queue 9/10
+- Held-out v1 (used to diagnose the fixes): Category 9/10 · Urgency 8/10 · Queue 11/12
+- Held-out v2 (written blind, second run): Category 8/10 · Urgency 9/10 · Queue 10/12
 
-The prompt was tuned on the seed set and the safeguards were designed from the v1 misses, so the v2 line is the honest number. The injection ticket and all six vague tickets now land in manual triage, but the model often reports `concrete_issue: false` for clear, simple questions, so 9 answerable tickets across the three sets were sent to manual triage too, which is why queue accuracy fell. Full table in [docs/eval-results.md](docs/eval-results.md).
+All six vague tickets now land in manual triage through low confidence, and the v1 injection ticket through the detector (the model itself still obeyed it). Remaining queue misses: one billing change sent to Customer Care instead of Billing Team, one account ticket labelled billing (caught as an inconsistent route), and one general shipping question sent to Logistics instead of Customer Care. Full table in [docs/eval-results.md](docs/eval-results.md).
 
 ## Known limitations
 
 - 7B local model: labels and drafts vary between runs, and a draft can still slip past a prompt rule (for example implying a refund). The human review step is the safeguard.
 - Confidence is the model's self-reported score, steered by a rubric and examples in the prompt. It is not a calibrated probability.
-- Model-reported signals can be wrong: `concrete_issue` currently flags many clear, simple questions, sending them to manual triage.
-- The injection detector is a set of regular expressions. A paraphrased attack can get past it, and unusual but honest wording can trip it (it only ever sends a ticket to manual triage).
+- Model-reported signals can be wrong: routing on `concrete_issue` sent many clear, simple questions to manual triage, so it is only used as a reasoning step.
+- The injection detector is a set of regular expressions. A paraphrased attack can get past it (the injection ticket in the blind held-out set did; the model happened to label it correctly anyway), and unusual but honest wording can trip it (it only ever sends a ticket to manual triage).
 - Single agent, no authentication.
 - The draft is not regenerated after the agent changes the classification.
 - SQLite file storage, no multi-user concurrency.

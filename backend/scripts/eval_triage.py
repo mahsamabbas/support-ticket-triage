@@ -20,15 +20,28 @@ from app.seed import SEED_TICKETS, SeedTicket
 from scripts.eval_cases import HELD_OUT_TICKETS
 from scripts.eval_cases_v2 import HELD_OUT_V2
 
-BEFORE_SAFEGUARDS = (
-    "Before the safeguards (16dbf02): Seed queue 9/10 · held-out v1 queue 9/12. EV-09 obeyed "
-    "the injected instructions; EV-11 and EV-12 were routed instead of sent to manual triage."
+HISTORY = (
+    "History:",
+    "",
+    "1. Before the safeguards (16dbf02): seed queue 9/10 · held-out v1 queue 9/12. EV-09 obeyed "
+    "the injected instructions; EV-11 and EV-12 were routed instead of sent to manual triage.",
+    "2. First run with the safeguards, including routing on `concrete_issue` (d263010): seed "
+    "queue 8/10 · held-out v1 queue 7/12 · held-out v2 queue 6/12. Nine answerable tickets went "
+    "to manual triage only because of the `missing_details` flag. The v2 injection ticket HX-12 "
+    "was not caught by the regex detector, but the model still labelled it correctly.",
+    "3. This run: `concrete_issue` is still asked before `confidence` but no longer routes, and "
+    "its definition now counts clear requests and policy questions.",
+    "",
+    "Held-out v2 has now been run twice. Dropping the `concrete_issue` routing rule was decided "
+    "after seeing the first v2 run, so v2 is no longer fully blind. The classify prompt was "
+    "tuned against the seed tickets and the safeguards were designed from the held-out v1 "
+    "misses. An expected label of `any` is not scored.",
 )
 
 EVAL_SETS: tuple[tuple[str, Sequence[SeedTicket]], ...] = (
     ("Seed tickets (used while tuning the prompt)", SEED_TICKETS),
     ("Held-out v1 (used to diagnose these fixes)", HELD_OUT_TICKETS),
-    ("Held-out v2 (written blind, run once after the fixes)", HELD_OUT_V2),
+    ("Held-out v2 (written blind; second run, see history)", HELD_OUT_V2),
 )
 
 
@@ -159,11 +172,7 @@ def render(model: str, threshold: float, run_date: date, sections: list[Section]
         f"classify latency mean {statistics.mean(latencies):.0f} ms, "
         f"median {statistics.median(latencies):.0f} ms over {len(latencies)} tickets",
         "",
-        BEFORE_SAFEGUARDS,
-        "",
-        "The classify prompt was tuned against the seed tickets and the safeguards were designed "
-        "after reading the held-out v1 misses, so held-out v2 is the honest number. An expected "
-        "label of `any` is not scored.",
+        *HISTORY,
     ]
     for title, rows in sections:
         lines += ["", *_section(title, rows)]

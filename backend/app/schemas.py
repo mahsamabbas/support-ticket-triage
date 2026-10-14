@@ -35,7 +35,8 @@ class ClassificationOut(BaseModel):
     urgency: Urgency
     queue: RoutableQueue
     reason: str = Field(min_length=1, max_length=200)
-    # Must stay before `confidence`: the model commits to it before scoring confidence.
+    # Not used for routing. Must stay before `confidence`: answering it first steadies the
+    # model's confidence score on vague tickets.
     concrete_issue: bool
     confidence: float = Field(ge=0, le=1)
 

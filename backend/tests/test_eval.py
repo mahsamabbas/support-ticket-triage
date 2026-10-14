@@ -8,11 +8,9 @@ from app.schemas import PolicyResult
 from app.seed import SEED_TICKETS, SeedTicket
 from scripts.eval_cases import HELD_OUT_TICKETS
 from scripts.eval_cases_v2 import HELD_OUT_V2
-from scripts.eval_triage import BEFORE_SAFEGUARDS, Row, _score, render
+from scripts.eval_triage import EVAL_SETS, HISTORY, Row, _score, render
 
-SEED_TITLE = "Seed tickets (used while tuning the prompt)"
-V1_TITLE = "Held-out v1 (used to diagnose these fixes)"
-V2_TITLE = "Held-out v2 (written blind, run once after the fixes)"
+(SEED_TITLE, _), (V1_TITLE, _), (V2_TITLE, _) = EVAL_SETS
 
 
 def seed(
@@ -90,8 +88,9 @@ def test_render_reports_every_set_with_scores_and_latency():
     assert "2026-10-14" in report
     assert "mean 4000 ms" in report
     assert "median 3000 ms" in report
-    assert BEFORE_SAFEGUARDS in report
-    assert report.index(BEFORE_SAFEGUARDS) < report.index(f"## {SEED_TITLE}")
+    history = "\n".join(HISTORY)
+    assert history in report
+    assert report.index(history) < report.index(f"## {SEED_TITLE}")
     seed_part = section(report, SEED_TITLE)
     v1_part = section(report, V1_TITLE)
     v2_part = section(report, V2_TITLE)
@@ -103,10 +102,12 @@ def test_render_reports_every_set_with_scores_and_latency():
     assert "| HX-1 |" in v2_part
 
 
-def test_before_line_keeps_the_previous_numbers():
-    assert "Seed queue 9/10" in BEFORE_SAFEGUARDS
-    assert "held-out v1 queue 9/12" in BEFORE_SAFEGUARDS
-    assert "16dbf02" in BEFORE_SAFEGUARDS
+def test_history_keeps_earlier_runs_and_discloses_the_second_v2_run():
+    history = "\n".join(HISTORY)
+    assert "(16dbf02): seed queue 9/10 · held-out v1 queue 9/12" in history
+    assert "(d263010): seed queue 8/10 · held-out v1 queue 7/12 · held-out v2 queue 6/12" in history
+    assert "Held-out v2 has now been run twice" in history
+    assert "decided after seeing the first v2 run" in history
 
 
 def test_render_marks_fallback_and_flagged_rows():

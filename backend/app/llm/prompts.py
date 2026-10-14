@@ -29,9 +29,10 @@ Urgency guide:
 - medium: degraded experience or delayed delivery.
 - low: questions and simple changes.
 
-concrete_issue: true when the ticket itself states a specific problem or question an agent \
-could act on (a product, order, charge, account action, delivery or symptom); false when it \
-only complains, chases a reply, or refers to something said elsewhere without restating it.
+concrete_issue: true when the ticket itself states a specific problem, request or question an \
+agent could act on (a product, order, charge, account action, delivery, policy or symptom); \
+false when it only complains, chases a reply, or refers to something said elsewhere without \
+restating it.
 
 confidence is a number from 0 to 1 that says how sure you are about the queue. Score it with \
 this rubric:

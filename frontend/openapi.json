@@ -328,7 +328,6 @@
           "low_confidence",
           "inconsistent_route",
           "ai_output_invalid",
-          "missing_details",
           "possible_injection"
         ],
         "title": "Flag"
