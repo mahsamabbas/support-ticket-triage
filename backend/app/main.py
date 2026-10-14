@@ -9,7 +9,7 @@ from app.config import Settings, get_settings
 from app.db import TicketRepository
 from app.errors import AppError
 from app.llm.client import LLMProvider, OllamaProvider
-from app.routes import system, tickets
+from app.routes import system, tickets, triage
 from app.seed import seed_if_empty
 
 
@@ -49,6 +49,7 @@ def create_app(settings: Settings | None = None, provider: LLMProvider | None = 
 
     app.include_router(system.router)
     app.include_router(tickets.router)
+    app.include_router(triage.router)
     return app
 
 
