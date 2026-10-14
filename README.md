@@ -164,6 +164,7 @@ History: before the safeguards the seed queue score was 9/10 and held-out v1 9/1
 ## Known limitations
 
 - 7B local model: labels and drafts vary between runs, and a draft can still slip past a prompt rule (for example implying a refund). The human review step is the safeguard.
+- Drafts are not grounded in store policy. Asked a direct factual question ("what are your weekend hours?"), the model sometimes invents an answer despite a prompt rule against it. A real deployment would draft from a policy knowledge base.
 - Confidence is the model's self-reported score, steered by a rubric and examples in the prompt. It is not a calibrated probability.
 - Model-reported signals can be wrong: routing on `concrete_issue` sent many clear, simple questions to manual triage, so it is only used as a reasoning step.
 - The injection detector is a set of regular expressions. Attacks worded outside its patterns get past it: the v2 injection was a fake system note the original patterns did not cover, and the v3 injection still slips past the widened set (the model labelled both correctly anyway). Unusual but honest wording can also trip it (it only ever sends a ticket to manual triage).
