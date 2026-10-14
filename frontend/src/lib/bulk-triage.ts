@@ -5,7 +5,7 @@ export const USER_STOP = "stopped";
 const STOP_ERRORS = new Set(["busy", "cancelled", "llm_unavailable", "network_error"]);
 
 export type BulkResult = { total: number; triaged: number; failed: number; stoppedBy: string | null };
-export type BulkSummary = { kind: "success" | "info" | "warning"; message: string };
+type BulkSummary = { kind: "success" | "info" | "warning"; message: string };
 
 type BulkOptions = {
   start: (id: string) => Promise<TriageOutcome>;

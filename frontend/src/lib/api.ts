@@ -9,7 +9,7 @@ import type {
   TicketStatus,
 } from "./types";
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8005";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8005";
 
 export class ApiError extends Error {
   readonly status: number;

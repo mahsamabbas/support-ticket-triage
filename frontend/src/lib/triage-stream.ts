@@ -19,7 +19,7 @@ export type TriageStreamState = {
   error: TriageError | null;
 };
 
-export type StepEvent = { name: "classify" | "draft"; state: "started" | "done"; ms?: number };
+type StepEvent = { name: "classify" | "draft"; state: "started" | "done"; ms?: number };
 
 type RunEvent =
   | { type: "step"; step: StepEvent }
@@ -70,12 +70,12 @@ const PROTOCOL_ERROR: TriageError = {
   message: "The triage stream sent data the console couldn't read.",
 };
 
-export function failRunningSteps(state: TriageStreamState, error: TriageError): TriageStreamState {
+function failRunningSteps(state: TriageStreamState, error: TriageError): TriageStreamState {
   const fail = (step: StepView): StepView => (step.state === "running" ? { state: "error" } : step);
   return { ...state, error, classify: fail(state.classify), draft: fail(state.draft) };
 }
 
-export function applyStep(state: TriageStreamState, step: StepEvent): TriageStreamState {
+function applyStep(state: TriageStreamState, step: StepEvent): TriageStreamState {
   const view: StepView = { state: step.state === "started" ? "running" : "done", ms: step.ms };
   return step.name === "classify" ? { ...state, classify: view } : { ...state, draft: view };
 }

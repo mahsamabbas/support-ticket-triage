@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useSyncExternalStore } from "react";
 
-export type HotkeyMap = Record<string, () => void>;
+type HotkeyMap = Record<string, () => void>;
 export type HotkeyEvent = Pick<KeyboardEvent, "altKey" | "shiftKey" | "repeat" | "isComposing" | "target">;
 type HotkeyContext = { repeatable: boolean; overlayOpen: boolean };
 type ElementLike = Pick<HTMLElement, "tagName" | "isContentEditable" | "getAttribute" | "closest">;

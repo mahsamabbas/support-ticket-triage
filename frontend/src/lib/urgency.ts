@@ -9,7 +9,7 @@ export const URGENCY_STYLES: Record<Urgency, UrgencyStyle> = {
   low: { label: "Low", dot: "bg-urgency-low", text: "text-urgency-low", pulse: false },
 };
 
-export type ConfidenceBand = "strong" | "fair" | "weak";
+type ConfidenceBand = "strong" | "fair" | "weak";
 
 const STRONG_CONFIDENCE = 0.8;
 

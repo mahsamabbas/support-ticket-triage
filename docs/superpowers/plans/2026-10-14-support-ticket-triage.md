@@ -1,5 +1,7 @@
 # QueueWise (Support Ticket Triage Copilot) Implementation Plan
 
+> **Original plan.** Changed since: CI dropped, `possible_injection` flag added (and a `missing_details` flag tried then removed), classify reason capped at 200 characters, three held-out eval sets. The README is current.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build QueueWise, a "Control Room" support console where a local LLM classifies synthetic NovaGear tickets (category, urgency, queue, reason, confidence), drafts a reply, and a human agent edits, approves or rejects.
@@ -11,7 +13,7 @@
 ## Global Constraints
 
 - Spec: `docs/superpowers/specs/2026-10-14-support-ticket-triage-design.md`
-- Repo root: `/Users/azc/Desktop/azc/mahsamabbas_repos/support-ticket-triage` (work directly on `main`, no worktrees)
+- Repo root: `<repo root>` (work directly on `main`, no worktrees)
 - Ports: frontend `3005`, API `8005`, Ollama `11434`
 - Model: `qwen2.5:7b`; classify temperature `0`, draft temperature `0.3`, `num_ctx` `8192`, timeout `60` s per step, one retry on transient connection errors
 - Confidence threshold: `0.6` (below → `Needs Manual Triage`, flag `low_confidence`)
@@ -24,15 +26,9 @@
 - Browser never calls Ollama. No email sending, no helpdesk integration, no cloud LLM.
 - Tests never hit a live model (LangChain fake chat models only). The eval script is the only live-model script.
 - Theme: dark "Control Room" — graphite background, grid lines, glass panels, Geist Sans + Geist Mono, signal lime primary, urgency colours critical red (pulsing), high amber, medium blue, low grey.
-- Python venv: `backend/.venv` created with `~/.local/bin/uv`. Node 22 at `~/.local/bin`.
+- Python venv: `backend/.venv` created with `uv`. Node 22.
 - Next.js 16 has breaking changes: before writing Next-specific code read `frontend/AGENTS.md` and the matching guide in `frontend/node_modules/next/dist/docs/`.
-- Git author: `mahsamabbas <6658043+mahsamabbas@users.noreply.github.com>` (already set in repo config). Cursor appends a `Co-authored-by: Cursor` trailer; strip it on **every** commit with this recipe:
-
-```bash
-MSG="your message"
-git commit -q -m "$MSG" && git reset -q --soft "$(git commit-tree 'HEAD^{tree}' -p HEAD~1 -m "$MSG")"
-git log -1 --format='%an <%ae>%n%B'   # must show mahsamabbas and no trailer
-```
+- Git author: `mahsamabbas <6658043+mahsamabbas@users.noreply.github.com>` (already set in repo config).
 
 ## File map
 
@@ -148,8 +144,8 @@ Create empty files: `backend/data/.gitkeep`, `backend/app/__init__.py`, `backend
 
 ```bash
 cd backend
-~/.local/bin/uv venv --python 3.12 .venv
-~/.local/bin/uv pip install --python .venv/bin/python -r requirements-dev.txt
+uv venv --python 3.12 .venv
+uv pip install --python .venv/bin/python -r requirements-dev.txt
 ```
 
 Expected: installs without errors.
@@ -2426,7 +2422,7 @@ git commit -q -m "$MSG" && git reset -q --soft "$(git commit-tree 'HEAD^{tree}' 
 - [ ] **Step 1: Scaffold Next.js**
 
 ```bash
-cd /Users/azc/Desktop/azc/mahsamabbas_repos/support-ticket-triage
+cd <repo root>
 npx create-next-app@latest frontend --ts --tailwind --eslint --app --src-dir \
   --import-alias "@/*" --use-npm --disable-git --yes
 ```
@@ -5415,6 +5411,8 @@ git commit -q -m "$MSG" && git reset -q --soft "$(git commit-tree 'HEAD^{tree}' 
 
 ### Task 14 (polish): CI workflow
 
+Dropped by the owner; this repo has no CI.
+
 **Files:**
 - Create: `.github/workflows/ci.yml`
 
@@ -5490,35 +5488,12 @@ git commit -q -m "$MSG" && git reset -q --soft "$(git commit-tree 'HEAD^{tree}' 
 
 - [ ] **Step 1: Secrets audit before pushing**
 
-```bash
-git ls-files | grep -E '(^|/)\.env$|\.db$|github_key|node_modules' || echo "clean"
-git grep -nE 'ghp_[A-Za-z0-9]{20,}|hf_[A-Za-z0-9]{20,}' || echo "no tokens"
-git log --format='%an <%ae>%n%b' | grep -i 'co-authored' || echo "no trailers"
-```
-
-Expected: `clean`, `no tokens`, `no trailers`.
+Check that no `.env` files, database files, key files or `node_modules` are tracked, and that no access tokens appear in tracked files.
 
 - [ ] **Step 2: Create the public repo and push**
 
-The PAT lives in the parent folder `../.github_key` (one line, never committed, never echoed).
-
-```bash
-TOKEN="$(cat ../.github_key)"
-curl -s -o /dev/null -w "%{http_code}\n" \
-  -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" \
-  https://api.github.com/user/repos \
-  -d '{"name":"support-ticket-triage","private":false,"description":"QueueWise — AI support ticket triage copilot: Next.js, shadcn/ui, FastAPI, LangChain, Pydantic, local Ollama"}'
-git push "https://x-access-token:${TOKEN}@github.com/mahsamabbas/support-ticket-triage.git" main
-git remote add origin https://github.com/mahsamabbas/support-ticket-triage.git
-git fetch origin && git branch --set-upstream-to=origin/main main
-unset TOKEN
-git remote -v   # must show the clean URL with no token
-```
-
-Expected: `201` (or `422` if the repo already exists), push succeeds.
-
-If the push is rejected with "refusing to allow a Personal Access Token to create or update workflow", the PAT lacks the `workflow` scope: stop and report it to the user (ask @Faz for a token with `workflow` scope) instead of deleting the CI file.
+Create the public repository `support-ticket-triage` on GitHub, add it as `origin`, and push `main`.
 
 - [ ] **Step 3: Confirm on GitHub**
 
-Open https://github.com/mahsamabbas/support-ticket-triage — README renders with screenshots, commit authors show only `mahsamabbas`, and the CI run is green.
+Open https://github.com/mahsamabbas/support-ticket-triage — README renders with screenshots and commit authors show only `mahsamabbas`.

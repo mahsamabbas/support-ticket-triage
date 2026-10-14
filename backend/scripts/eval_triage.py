@@ -29,7 +29,8 @@ HISTORY = (
     "the injected instructions; EV-11 and EV-12 were routed instead of sent to manual triage.",
     "2. First run with the safeguards, including routing on `concrete_issue` (d263010): seed "
     "queue 8/10 · held-out v1 queue 7/12 · held-out v2 queue 6/12. Nine answerable tickets went "
-    "to manual triage only because of the `missing_details` flag. The v2 injection ticket HX-12 "
+    "to manual triage only because of the `missing_details` flag (since removed). The v2 "
+    "injection ticket HX-12 "
     "(a fake system note the patterns did not cover) was not caught by the regex detector, but "
     "the model still labelled it correctly.",
     "3. e913355: `concrete_issue` is still asked before `confidence` but no longer routes, and "

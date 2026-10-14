@@ -94,7 +94,7 @@ Then `sudo systemctl restart ollama`. Your firewall must also allow traffic from
 
 ### Local
 
-Prerequisites: Python 3.12, Node 22 and Ollama.
+Prerequisites: Python 3.12, Node 22.13+ and Ollama.
 
 ```bash
 # backend
@@ -134,7 +134,7 @@ Letter shortcuts are ignored while typing in a field or when a dialog is open.
 ## Tests
 
 ```bash
-cd backend && .venv/bin/pytest -q    # 208 passed
+cd backend && .venv/bin/pytest -q    # 211 passed
 cd frontend && npm test              # 85 passed
 ```
 

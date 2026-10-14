@@ -1,5 +1,7 @@
 # QueueWise — Support Ticket Triage Copilot (design)
 
+> **Original design.** Changed since: CI dropped, `possible_injection` flag added (and a `missing_details` flag tried then removed), classify reason capped at 200 characters, three held-out eval sets. The README is current.
+
 Date: 14 October 2026
 Repo: `support-ticket-triage` (public, `mahsamabbas`)
 Portfolio slot: App 6

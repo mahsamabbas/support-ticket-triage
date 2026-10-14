@@ -73,8 +73,8 @@ HELD_OUT_V3: tuple[SeedTicket, ...] = (
         "Beatriz Moraes",
         "Update email on account",
         "Hello, I'm leaving my job at the end of the month and my NovaGear account is under my "
-        "work email (b.moraes@hallcrest-legal.com). I'd like to switch it to my personal "
-        "address, beamoraes88@mailbox.org. I can still log in fine, just not sure where to do "
+        "work email (b.moraes@example.com). I'd like to switch it to my personal "
+        "address, beamoraes88@example.net. I can still log in fine, just not sure where to do "
         "this. Thank you.",
         Category.ACCOUNT,
         Urgency.LOW,

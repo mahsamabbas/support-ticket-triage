@@ -133,6 +133,7 @@ def test_history_keeps_earlier_runs_and_discloses_the_second_v2_run():
     assert "v3 was written blind after e913355 and has been run once" in history
     assert "held-out v3 queue 11/12 (n=12, single run)" in history
     assert "a fake system note the patterns did not cover" in history
+    assert "the `missing_details` flag (since removed)" in history
 
 
 def test_history_states_the_injection_caveats():
