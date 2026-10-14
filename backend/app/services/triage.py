@@ -53,13 +53,12 @@ class TriageService:
         except LLMUnavailableError as exc:
             yield _unavailable(exc)
             return
+        injection_suspected = ticket_looks_like_injection(ticket)
         if classification is None:
-            result = fallback_result()
+            result = fallback_result(injection_suspected=injection_suspected)
         else:
             result = apply_policy(
-                classification,
-                self._threshold,
-                injection_suspected=ticket_looks_like_injection(ticket),
+                classification, self._threshold, injection_suspected=injection_suspected
             )
         classify_ms = _elapsed_ms(started)
         yield TriageEvent("step", {"name": "classify", "state": "done", "ms": classify_ms})

@@ -27,12 +27,15 @@ def apply_policy(
     )
 
 
-def fallback_result() -> PolicyResult:
+def fallback_result(*, injection_suspected: bool = False) -> PolicyResult:
+    flags = [Flag.AI_OUTPUT_INVALID]
+    if injection_suspected:
+        flags.append(Flag.POSSIBLE_INJECTION)
     return PolicyResult(
         category=Category.GENERAL,
         urgency=Urgency.MEDIUM,
         queue=Queue.MANUAL_TRIAGE,
         reason=FALLBACK_REASON,
         confidence=0.0,
-        flags=[Flag.AI_OUTPUT_INVALID],
+        flags=flags,
     )

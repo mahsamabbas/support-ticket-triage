@@ -1,9 +1,9 @@
-"""Held-out eval tickets. Never seeded into the DB and never used while tuning the prompt."""
+"""Held-out v1 eval tickets. Never seeded into the DB; their misses shaped the safeguards."""
 
 from app.domain.taxonomy import Category, Queue, Urgency
 from app.seed import SeedTicket
 
-HELD_OUT_TICKETS: tuple[SeedTicket, ...] = (
+HELD_OUT_V1: tuple[SeedTicket, ...] = (
     SeedTicket(
         "EV-01",
         "Hannah Weber",

@@ -85,7 +85,7 @@ def test_injection_is_not_suspected_by_default():
 
 
 def test_all_flags_can_apply_together():
-    classification = make(queue="Logistics", confidence=0.2, concrete_issue=False)
+    classification = make(queue="Logistics", confidence=0.2)
     result = apply_policy(classification, threshold=0.6, injection_suspected=True)
     assert result.flags == [
         Flag.LOW_CONFIDENCE,
@@ -118,6 +118,12 @@ def test_fallback_is_manual_with_invalid_flag():
     assert result.confidence == 0.0
     assert result.flags == [Flag.AI_OUTPUT_INVALID]
     assert result.reason == FALLBACK_REASON
+
+
+def test_fallback_also_carries_suspected_injection():
+    result = fallback_result(injection_suspected=True)
+    assert result.queue == Queue.MANUAL_TRIAGE
+    assert result.flags == [Flag.AI_OUTPUT_INVALID, Flag.POSSIBLE_INJECTION]
 
 
 def test_routable_queues_are_queue_minus_manual():

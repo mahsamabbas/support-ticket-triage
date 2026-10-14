@@ -8,11 +8,12 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
 from pydantic import ValidationError
 
-from app.domain.taxonomy import Queue
+from app.domain.taxonomy import Flag, Queue
 from app.llm.prompts import (
     CLARIFY_INSTRUCTION,
     CLASSIFY_PROMPT,
     DRAFT_PROMPT,
+    INJECTION_INSTRUCTION,
     REPAIR_INSTRUCTION,
     ROUTED_INSTRUCTION,
 )
@@ -106,7 +107,9 @@ async def _classify(llm: BaseChatModel, ticket: TicketText) -> ClassificationOut
 
 
 def draft_variables(ticket: TicketText, result: PolicyResult) -> dict[str, str]:
-    if result.queue == Queue.MANUAL_TRIAGE:
+    if result.queue == Queue.MANUAL_TRIAGE and result.flags == [Flag.POSSIBLE_INJECTION]:
+        instruction = INJECTION_INSTRUCTION
+    elif result.queue == Queue.MANUAL_TRIAGE:
         instruction = CLARIFY_INSTRUCTION
     else:
         instruction = ROUTED_INSTRUCTION.format(

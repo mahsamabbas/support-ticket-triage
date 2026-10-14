@@ -35,8 +35,9 @@ class ClassificationOut(BaseModel):
     urgency: Urgency
     queue: RoutableQueue
     reason: str = Field(min_length=1, max_length=200)
-    # Not used for routing. Must stay before `confidence`: answering it first steadies the
-    # model's confidence score on vague tickets.
+    # Not used for routing; kept before `confidence` so the model answers it first. It was added
+    # together with prompt changes that coincided with better confidence on vague tickets; the
+    # effect was not isolated.
     concrete_issue: bool
     confidence: float = Field(ge=0, le=1)
 

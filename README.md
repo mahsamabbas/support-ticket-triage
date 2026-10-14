@@ -9,7 +9,7 @@ Portfolio app 6 of 10. Scope: classify sample tickets, explain the suggested que
 ## What it does
 
 - **Two-step LangChain pipeline.** *Classify* returns JSON constrained by a JSON schema and validated by Pydantic (one repair retry). *Draft* streams the reply token by token.
-- **Routing policy in code, not in the prompt.** Confidence below 0.6, a queue that does not serve the category, or instruction-like text caught by the injection detector sends the ticket to `Needs Manual Triage` with a flag. The draft then only asks the customer for details. The model also answers `concrete_issue` (does the ticket state an actionable problem?) just before scoring confidence; this steadies confidence on vague tickets but is not a routing rule.
+- **Routing policy in code, not in the prompt.** Confidence below 0.6, a queue that does not serve the category, or instruction-like text caught by the injection detector sends the ticket to `Needs Manual Triage` with a flag. The draft then asks the customer for details, or, when the only flag is suspected injection, answers the genuine request without acting on the embedded instructions. The model also answers `concrete_issue` (does the ticket state an actionable problem?) just before scoring confidence. It is not a routing rule; it was added together with prompt changes that coincided with better confidence on vague tickets, and its effect was not isolated.
 - **Live pipeline over SSE.** Both steps animate in the UI with their timings.
 - **Human in control.** Category, urgency and queue are editable; Approve is blocked until the route is valid. Every change against the AI suggestion shows as an audit chip.
 - **Triage all new.** One click walks every new ticket through the pipeline with a progress bar. **Stop** ends the run at any time, and it stops by itself if the model or API goes offline. You can keep browsing other tickets while it runs.
@@ -134,12 +134,12 @@ Letter shortcuts are ignored while typing in a field or when a dialog is open.
 ## Tests
 
 ```bash
-cd backend && .venv/bin/pytest -q    # 184 passed
+cd backend && .venv/bin/pytest -q    # 203 passed
 cd frontend && npm test              # 85 passed
 ```
 
 Normal case: a double-charge ticket is classified `billing` / `high` / `Billing Team` and the draft streams and saves.
-Failure cases: low confidence, queue that does not fit the category, instruction-like text in the subject or body, broken model JSON (repair then fallback), Chinese/Japanese/Korean text in the reason (repair, then manual-triage fallback), model picking the manual queue, empty or oversized tickets, Ollama down (503), draft failing mid-stream, approving twice (409), approving into manual triage or a wrong queue (422).
+Failure cases: low confidence, queue that does not fit the category, instruction-like text in the subject or body (also on the fallback path), broken model JSON (repair then fallback), Chinese/Japanese/Korean text in the reason (repair, then manual-triage fallback), model picking the manual queue, empty or oversized tickets, Ollama down (503), draft failing mid-stream, approving twice (409), approving into manual triage or a wrong queue (422).
 
 ## Evaluation
 
@@ -147,9 +147,11 @@ Failure cases: low confidence, queue that does not fit the category, instruction
 
 **Honest blind number** — held-out v3, written blind after the last prompt/policy change and run once (`qwen2.5:7b`, median classify 1461 ms):
 
-- Held-out v3: Category 10/10 · Urgency 7/10 · Queue 11/12
+- Held-out v3 (n=12, single run): Category 10/10 · Urgency 7/10 · Queue 11/12
 
-The v3 misses are three urgencies rated one level too low (two `critical` tickets rated `high`, one `high` rated `medium`) and one simple billing change sent to Customer Care instead of Billing Team. Its prompt-injection ticket was not caught by the regex detector, but the model labelled the real request correctly.
+The v3 misses are three urgencies rated one level too low (two `critical` tickets rated `high`, one `high` rated `medium`) and one simple billing change sent to Customer Care instead of Billing Team. Its prompt-injection ticket was not caught by the regex detector, but the model labelled the real request correctly. Twelve tickets is a small sample, so treat these as rough numbers.
+
+Injection scoring caveat: injection tickets are labelled by the genuine request, so a caught injection (EV-09) counts as a miss and a missed one the model handles correctly counts as a hit. Even after prompt hardening the model still obeyed EV-09; the regex check plus human review are the real guard.
 
 Other sets in the same run:
 
@@ -157,14 +159,14 @@ Other sets in the same run:
 - Held-out v1 (used to diagnose the fixes): Category 9/10 · Urgency 8/10 · Queue 11/12
 - Held-out v2 (written blind, but now run twice; see below): Category 8/10 · Urgency 9/10 · Queue 10/12
 
-History: before the safeguards the seed queue score was 9/10 and held-out v1 9/12, with the v1 injection obeyed and both vague v1 tickets routed. The first run with the safeguards also routed on `concrete_issue` and scored seed 8/10, v1 7/12 and blind v2 6/12, because that rule alone sent 9 answerable tickets to manual triage. The rule was dropped after seeing that v2 run (the field is kept as a reasoning step), so v2 is no longer fully blind, which is why v3 was written. All eight vague tickets across the held-out and seed sets now land in manual triage through low confidence. Full tables in [docs/eval-results.md](docs/eval-results.md).
+History: before the safeguards the seed queue score was 9/10 and held-out v1 9/12, with the v1 injection obeyed and both vague v1 tickets routed. The first run with the safeguards also routed on `concrete_issue` and scored seed 8/10, v1 7/12 and blind v2 6/12, because that rule alone sent 9 answerable tickets to manual triage. The rule was dropped after seeing that v2 run (the field is kept as a reasoning step), so v2 is no longer fully blind, which is why v3 was written. All eight vague tickets across the held-out and seed sets now land in manual triage through low confidence. At the v3 run the detector caught 1 of 3 held-out injections; it was widened afterwards, after v2 and v3 had been seen, and now flags 2 of 3 (QX-12 still slips past) with no false positives on the other 43 tickets. That rate is not blind, and the scores above were not re-run with the wider detector. Full tables in [docs/eval-results.md](docs/eval-results.md).
 
 ## Known limitations
 
 - 7B local model: labels and drafts vary between runs, and a draft can still slip past a prompt rule (for example implying a refund). The human review step is the safeguard.
 - Confidence is the model's self-reported score, steered by a rubric and examples in the prompt. It is not a calibrated probability.
 - Model-reported signals can be wrong: routing on `concrete_issue` sent many clear, simple questions to manual triage, so it is only used as a reasoning step.
-- The injection detector is a set of regular expressions. A paraphrased attack can get past it (the injection tickets in both blind held-out sets did; the model happened to label them correctly anyway), and unusual but honest wording can trip it (it only ever sends a ticket to manual triage).
+- The injection detector is a set of regular expressions. Attacks worded outside its patterns get past it: the v2 injection was a fake system note the original patterns did not cover, and the v3 injection still slips past the widened set (the model labelled both correctly anyway). Unusual but honest wording can also trip it (it only ever sends a ticket to manual triage).
 - Single agent, no authentication.
 - The draft is not regenerated after the agent changes the classification.
 - SQLite file storage, no multi-user concurrency.

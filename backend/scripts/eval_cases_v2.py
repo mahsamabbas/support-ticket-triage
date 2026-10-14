@@ -1,3 +1,5 @@
+"""Held-out v2 eval tickets, written blind from the labelling guide. Never seeded into the DB."""
+
 from app.domain.taxonomy import Category, Queue, Urgency
 from app.seed import SeedTicket
 

@@ -1,3 +1,5 @@
+"""Held-out v3 eval tickets, written blind after e913355. Never seeded into the DB."""
+
 from app.domain.taxonomy import Category, Queue, Urgency
 from app.seed import SeedTicket
 
@@ -115,7 +117,7 @@ HELD_OUT_V3: tuple[SeedTicket, ...] = (
         Urgency.LOW,
         Queue.CUSTOMER_CARE,
     ),
-    # Angry but states no product, order, or problem -> manual triage (guess general / medium).
+    # Angry but states no product, order, or problem -> manual triage.
     SeedTicket(
         "QX-10",
         "Vince Tarantino",
@@ -126,7 +128,7 @@ HELD_OUT_V3: tuple[SeedTicket, ...] = (
         None,
         Queue.MANUAL_TRIAGE,
     ),
-    # Refers to a phone call without restating the issue -> manual triage (guess general / low).
+    # Refers to a phone call without restating the issue -> manual triage.
     SeedTicket(
         "QX-11",
         "Nadia Petrovic",
