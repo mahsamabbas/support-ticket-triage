@@ -82,13 +82,21 @@ describe("shouldHandle", () => {
   });
 });
 
+const USER_AGENTS = {
+  macChrome:
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+  iPadSafari:
+    "Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+  windowsChrome:
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+  linuxFirefox: "Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0",
+};
+
 describe("modShortcut", () => {
-  it("uses the command glyph on Apple platforms", () => {
-    expect(modShortcut("MacIntel", "K")).toBe("⌘K");
-    expect(modShortcut("iPhone", "K")).toBe("⌘K");
+  it.each([USER_AGENTS.macChrome, USER_AGENTS.iPadSafari])("uses the command glyph for %s", (userAgent) => {
+    expect(modShortcut(userAgent, "K")).toBe("⌘K");
   });
-  it("uses Ctrl elsewhere", () => {
-    expect(modShortcut("Win32", "K")).toBe("Ctrl K");
-    expect(modShortcut("Linux x86_64", "K")).toBe("Ctrl K");
+  it.each([USER_AGENTS.windowsChrome, USER_AGENTS.linuxFirefox])("uses Ctrl for %s", (userAgent) => {
+    expect(modShortcut(userAgent, "K")).toBe("Ctrl K");
   });
 });

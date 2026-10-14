@@ -1,32 +1,42 @@
 "use client";
 
-import { ListChecks } from "lucide-react";
+import { ListChecks, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
 export type BulkProgress = { done: number; total: number };
 
-type Props = { progress: BulkProgress | null; disabled: boolean; onClick: () => void };
+type Props = {
+  progress: BulkProgress | null;
+  disabled: boolean;
+  onClick: () => void;
+  onStop: () => void;
+};
 
-export function TriageAllButton({ progress, disabled, onClick }: Props) {
-  if (progress) {
-    return (
-      <div className="flex w-48 items-center gap-2 font-mono text-xs text-muted-foreground">
-        <Progress
-          value={(progress.done / progress.total) * 100}
-          aria-label="Triage all progress"
-          className="h-1.5"
-        />
-        <span className="tabular-nums">
-          {progress.done}/{progress.total}
-        </span>
-      </div>
-    );
-  }
+export function TriageAllButton({ progress, disabled, onClick, onStop }: Props) {
   return (
-    <Button variant="secondary" size="sm" onClick={onClick} disabled={disabled}>
-      <ListChecks className="size-4" />
-      Triage all new
-    </Button>
+    <div className="flex items-center gap-2">
+      {progress && (
+        <div className="flex w-36 items-center gap-2 font-mono text-xs text-muted-foreground">
+          <Progress
+            value={(progress.done / progress.total) * 100}
+            aria-label="Triage all progress"
+            className="h-1.5"
+          />
+          <span className="tabular-nums">
+            {progress.done}/{progress.total}
+          </span>
+        </div>
+      )}
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={progress ? onStop : onClick}
+        disabled={progress ? false : disabled}
+      >
+        {progress ? <Square className="size-4" /> : <ListChecks className="size-4" />}
+        {progress ? "Stop" : "Triage all new"}
+      </Button>
+    </div>
   );
 }

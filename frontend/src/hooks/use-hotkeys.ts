@@ -38,8 +38,8 @@ export function shouldHandle(event: HotkeyEvent, id: string, { repeatable, overl
   return !asElement(event.target)?.closest(OVERLAY_ROLES);
 }
 
-export function modShortcut(platform: string, key: string): string {
-  return /Mac|iPhone|iPad|iPod/.test(platform) ? `⌘${key}` : `Ctrl ${key}`;
+export function modShortcut(userAgent: string, key: string): string {
+  return /Mac|iPhone|iPad|iPod/.test(userAgent) ? `⌘${key}` : `Ctrl ${key}`;
 }
 
 export function useHotkeys(map: HotkeyMap, { repeatable = [] }: { repeatable?: readonly string[] } = {}) {

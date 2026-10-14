@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Command,
   CommandDialog,
   CommandEmpty,
   CommandGroup,
@@ -53,42 +54,54 @@ export function CommandPalette({
       title="Command palette"
       description="Jump to a ticket or run an action"
     >
-      <CommandInput placeholder="Search tickets or actions…" />
-      <CommandList>
-        <CommandEmpty>No matches.</CommandEmpty>
-        <CommandGroup heading="Actions">
-          <CommandItem onSelect={() => run(onNewTicket)}>New ticket</CommandItem>
-          <CommandItem onSelect={() => run(onTriageAll)}>Triage all new tickets</CommandItem>
-          <CommandItem onSelect={() => run(() => onFilterQueue(undefined))}>Show all queues</CommandItem>
-        </CommandGroup>
-        <CommandGroup heading="Queues">
-          {queues.map((queue) => (
-            <CommandItem key={queue} onSelect={() => run(() => onFilterQueue(queue))}>
-              Filter: {queue}
+      <Command>
+        <CommandInput placeholder="Search tickets or actions…" />
+        <CommandList>
+          <CommandEmpty>No matches.</CommandEmpty>
+          <CommandGroup heading="Actions">
+            <CommandItem value="New ticket" onSelect={() => run(onNewTicket)}>
+              New ticket
             </CommandItem>
-          ))}
-        </CommandGroup>
-        <CommandGroup heading="Tickets">
-          {tickets.map((ticket) => (
-            <CommandItem
-              key={ticket.id}
-              value={`${ticket.id} ${ticket.subject} ${ticket.customer_name}`}
-              onSelect={() => run(() => onSelectTicket(ticket.id))}
-            >
-              <span className="font-mono text-xs text-muted-foreground">{ticket.id}</span>
-              <span className="truncate">{ticket.subject}</span>
+            <CommandItem value="Triage all new tickets" onSelect={() => run(onTriageAll)}>
+              Triage all new tickets
             </CommandItem>
-          ))}
-        </CommandGroup>
-        <CommandGroup heading="Shortcuts">
-          {shortcuts.map(([keys, label]) => (
-            <CommandItem key={label} disabled>
-              {label}
-              <CommandShortcut>{keys}</CommandShortcut>
+            <CommandItem value="Show all queues" onSelect={() => run(() => onFilterQueue(undefined))}>
+              Show all queues
             </CommandItem>
-          ))}
-        </CommandGroup>
-      </CommandList>
+          </CommandGroup>
+          <CommandGroup heading="Queues">
+            {queues.map((queue) => (
+              <CommandItem
+                key={queue}
+                value={`Filter: ${queue}`}
+                onSelect={() => run(() => onFilterQueue(queue))}
+              >
+                Filter: {queue}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+          <CommandGroup heading="Tickets">
+            {tickets.map((ticket) => (
+              <CommandItem
+                key={ticket.id}
+                value={`${ticket.id} ${ticket.subject} ${ticket.customer_name}`}
+                onSelect={() => run(() => onSelectTicket(ticket.id))}
+              >
+                <span className="font-mono text-xs text-muted-foreground">{ticket.id}</span>
+                <span className="truncate">{ticket.subject}</span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+          <CommandGroup heading="Shortcuts">
+            {shortcuts.map(([keys, label]) => (
+              <CommandItem key={label} value={`Shortcut ${label} ${keys}`} disabled>
+                {label}
+                <CommandShortcut>{keys}</CommandShortcut>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        </CommandList>
+      </Command>
     </CommandDialog>
   );
 }

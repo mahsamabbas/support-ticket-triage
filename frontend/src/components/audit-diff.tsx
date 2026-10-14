@@ -1,9 +1,9 @@
 import { ArrowRight } from "lucide-react";
 import type { AuditChange } from "@/lib/review";
 
-type Props = { changes: AuditChange[]; title?: string };
+type Props = { changes: AuditChange[]; title: string };
 
-export function AuditDiff({ changes, title = "Agent overrides" }: Props) {
+export function AuditDiff({ changes, title }: Props) {
   if (changes.length === 0) return null;
   return (
     <div className="flex flex-col gap-2">

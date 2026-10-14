@@ -2,12 +2,13 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { Search } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useHotkeys, useModShortcut } from "@/hooks/use-hotkeys";
 import { useTriageStream, type TriageOutcome } from "@/hooks/use-triage-stream";
 import { ApiError, api, type TicketFilters } from "@/lib/api";
+import { bulkSummary, runBulkTriage, shouldFollow } from "@/lib/bulk-triage";
 import { queryKeys, useTaxonomy, useTicket, useTickets } from "@/lib/queries";
 import { CommandPalette } from "./command-palette";
 import { DecisionPanel } from "./decision-panel";
@@ -19,15 +20,14 @@ import { TopBar } from "./top-bar";
 import { TriageAllButton, type BulkProgress } from "./triage-all-button";
 
 const SILENT_TRIAGE_ERRORS = new Set(["busy", "cancelled"]);
-const BULK_STOP_ERRORS = new Set(["busy", "cancelled", "llm_unavailable"]);
 const NEW_TICKETS: TicketFilters = { status: "new" };
 
 function clickAction(action: "approve" | "reject") {
   document.querySelector<HTMLButtonElement>(`[data-action="${action}"]:not(:disabled)`)?.click();
 }
 
-function plural(count: number, noun: string) {
-  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+function ticketRow(id: string) {
+  return document.querySelector(`[data-ticket-id="${id}"]`);
 }
 
 export function Console() {
@@ -38,6 +38,9 @@ export function Console() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [bulk, setBulk] = useState<BulkProgress | null>(null);
   const bulkRunning = useRef(false);
+  const stopRequested = useRef(false);
+  const selectedRef = useRef<string | null>(null);
+  const pendingReveal = useRef<string | null>(null);
   const paletteShortcut = useModShortcut("K");
   const tickets = useTickets(filters);
   const allTickets = useTickets({});
@@ -49,10 +52,34 @@ export function Console() {
   const triage = useTriageStream();
   const stream = triage.state.ticketId === activeId ? triage.state : null;
 
-  async function runTriage(id: string, { quiet = false } = {}): Promise<TriageOutcome> {
+  useEffect(() => {
+    selectedRef.current = selectedId;
+  }, [selectedId]);
+
+  useEffect(() => {
+    const id = pendingReveal.current;
+    if (!id) return;
+    if (id !== selectedId) {
+      pendingReveal.current = null;
+      return;
+    }
+    const row = ticketRow(id);
+    if (!row) return;
+    row.scrollIntoView({ block: "nearest" });
+    pendingReveal.current = null;
+  }, [tickets.data, selectedId]);
+
+  function revealTicket(id: string) {
+    selectedRef.current = id;
+    setSelectedId(id);
+    const row = ticketRow(id);
+    row?.scrollIntoView({ block: "nearest" });
+    pendingReveal.current = row ? null : id;
+  }
+
+  async function runTriage(id: string): Promise<TriageOutcome> {
     setSelectedId(id);
     const outcome = await triage.start(id);
-    if (quiet) return outcome;
     if (outcome.ok) {
       const queue = outcome.ticket.triage?.ai_queue;
       toast.success(queue ? `${outcome.ticket.id} → ${queue}` : `${outcome.ticket.id} triaged`);
@@ -69,60 +96,77 @@ export function Console() {
     }
   }
 
-  async function triageAllNew() {
-    if (bulkRunning.current || triage.isRunning) return;
-    bulkRunning.current = true;
+  async function loadNewTickets() {
     try {
-      const pending = await queryClient.fetchQuery({
+      return await queryClient.fetchQuery({
         queryKey: queryKeys.tickets(NEW_TICKETS),
         queryFn: () => api.tickets(NEW_TICKETS),
         staleTime: 0,
       });
-      const total = pending.length;
-      if (total === 0) {
+    } catch (error) {
+      toast.error("Could not load new tickets.", {
+        description: error instanceof ApiError ? error.message : undefined,
+      });
+      return null;
+    }
+  }
+
+  async function triageAllNew() {
+    if (bulkRunning.current || triage.isRunning) {
+      toast.info("A triage is already running.");
+      return;
+    }
+    bulkRunning.current = true;
+    stopRequested.current = false;
+    try {
+      const pending = await loadNewTickets();
+      if (!pending) return;
+      if (pending.length === 0) {
         toast.info("No new tickets to triage.");
         return;
       }
+      const total = pending.length;
       setBulk({ done: 0, total });
-      let triaged = 0;
-      let failed = 0;
-      let stoppedBy: string | null = null;
-      for (const [index, item] of pending.entries()) {
-        const outcome = await runTriage(item.id, { quiet: true });
-        setBulk({ done: index + 1, total });
-        if (outcome.ok) {
-          triaged += 1;
-        } else if (BULK_STOP_ERRORS.has(outcome.error.code)) {
-          stoppedBy = outcome.error.code;
-          break;
-        } else {
-          failed += 1;
-        }
-      }
-      if (stoppedBy === "cancelled") return;
-      if (stoppedBy === "llm_unavailable") {
-        toast.warning(`Stopped: the model is unavailable. Triaged ${triaged} of ${total}.`);
-      } else if (stoppedBy === "busy") {
-        toast.info(`Stopped: another triage is running. Triaged ${triaged} of ${total}.`);
-      } else if (failed === 0) {
-        toast.success(`Triaged ${plural(total, "ticket")}.`);
-      } else {
-        toast.warning(`${failed} of ${plural(total, "ticket")} failed to triage.`);
-      }
-    } catch (error) {
-      toast.error(error instanceof ApiError ? error.message : "Could not load new tickets.");
+      let lastAutoId = selectedRef.current;
+      const result = await runBulkTriage(
+        pending.map((item) => item.id),
+        {
+          start: triage.start,
+          stopRequested: () => stopRequested.current,
+          beforeEach: (id) => {
+            if (!shouldFollow(selectedRef.current, lastAutoId)) return;
+            lastAutoId = id;
+            revealTicket(id);
+          },
+          onProgress: (done) => setBulk({ done, total }),
+        },
+      );
+      const summary = bulkSummary(result);
+      if (summary) toast[summary.kind](summary.message);
+    } catch {
+      toast.error("Triage all stopped unexpectedly.");
     } finally {
       bulkRunning.current = false;
+      stopRequested.current = false;
       setBulk(null);
     }
+  }
+
+  function stopBulk() {
+    stopRequested.current = true;
+    triage.cancel();
+  }
+
+  function selectFromPalette(id: string) {
+    if (!list.some((item) => item.id === id)) setFilters({});
+    revealTicket(id);
   }
 
   function selectRelative(delta: number) {
     if (list.length === 0) return;
     const index = list.findIndex((item) => item.id === activeId);
     const next = list[Math.min(list.length - 1, Math.max(0, index + delta))];
-    setSelectedId(next.id);
-    document.querySelector(`[data-ticket-id="${next.id}"]`)?.scrollIntoView({ block: "nearest" });
+    revealTicket(next.id);
   }
 
   useHotkeys(
@@ -155,6 +199,7 @@ export function Console() {
               progress={bulk}
               disabled={triage.isRunning}
               onClick={() => void triageAllNew()}
+              onStop={stopBulk}
             />
             <Button
               variant="ghost"
@@ -200,7 +245,7 @@ export function Console() {
         onOpenChange={setPaletteOpen}
         tickets={allTickets.data ?? []}
         queues={taxonomy.data?.queues ?? []}
-        onSelectTicket={setSelectedId}
+        onSelectTicket={selectFromPalette}
         onFilterQueue={(queue) => setFilters((current) => ({ ...current, queue }))}
         onNewTicket={() => setNewTicketOpen(true)}
         onTriageAll={() => void triageAllNew()}
