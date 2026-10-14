@@ -1,0 +1,13 @@
+.DS_Store
+.env
+backend/.env
+backend/.venv/
+backend/data/*.db
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
+frontend/next-env.d.ts
+frontend/tsconfig.tsbuildinfo
