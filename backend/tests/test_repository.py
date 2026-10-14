@@ -1,6 +1,6 @@
 import pytest
 
-from app.db import TicketRepository
+from app.db import TicketRepository, TicketStateChangedError
 from app.domain.taxonomy import Category, Flag, Queue, TicketStatus, Urgency
 from app.schemas import PolicyResult, ReviewRequest, TicketCreate
 from app.seed import SEED_TICKETS, seed_if_empty
@@ -61,14 +61,9 @@ def test_save_triage_sets_status_and_record(repo):
     assert ticket.triage.final_queue is None
 
 
-def test_retriage_replaces_result_and_clears_review(repo):
+def test_retriage_replaces_result(repo):
     seed_if_empty(repo)
     repo.save_triage("NG-1001", policy(), "first", "m", 1, 1)
-    repo.save_review(
-        "NG-1001",
-        ReviewRequest(action="reject", review_note="wrong"),
-        TicketStatus.REJECTED,
-    )
     ticket = repo.save_triage(
         "NG-1001",
         policy(queue=Queue.MANUAL_TRIAGE, flags=[Flag.LOW_CONFIDENCE]),
@@ -80,8 +75,34 @@ def test_retriage_replaces_result_and_clears_review(repo):
     assert ticket.status == TicketStatus.TRIAGED
     assert ticket.triage.ai_draft == "second"
     assert ticket.triage.flags == [Flag.LOW_CONFIDENCE]
-    assert ticket.triage.review_note is None
-    assert ticket.triage.reviewed_at is None
+    assert ticket.triage.classify_ms == 2
+
+
+@pytest.mark.parametrize(
+    ("review", "status"),
+    [
+        (
+            ReviewRequest(
+                action="approve",
+                final_category="billing",
+                final_urgency="critical",
+                final_queue="Billing Team",
+                final_draft="edited",
+            ),
+            TicketStatus.APPROVED,
+        ),
+        (ReviewRequest(action="reject", review_note="wrong"), TicketStatus.REJECTED),
+    ],
+)
+def test_save_triage_refuses_reviewed_ticket(repo, review, status):
+    seed_if_empty(repo)
+    repo.save_triage("NG-1001", policy(), "first", "m", 1, 1)
+    reviewed = repo.save_review("NG-1001", review, status)
+
+    with pytest.raises(TicketStateChangedError):
+        repo.save_triage("NG-1001", policy(urgency=Urgency.LOW), "second", "m", 2, 2)
+
+    assert repo.get("NG-1001") == reviewed
 
 
 def test_list_puts_new_first_then_sorts_by_urgency(repo):

@@ -1,8 +1,28 @@
+import pytest
+
 from app.db import TicketRepository
+from app.domain.taxonomy import TicketStatus
+from app.schemas import PolicyResult, ReviewRequest
 from app.seed import seed_if_empty
 from app.services.triage import TriageService
 from tests.fakes import DRAFT_TEXT, SlowChatModel, classification_json
 from tests.sse_utils import parse_sse
+
+APPROVAL = ReviewRequest(
+    action="approve",
+    final_category="billing",
+    final_urgency="critical",
+    final_queue="Billing Team",
+    final_draft="Edited by a human.",
+)
+
+
+@pytest.fixture
+def repo(tmp_path) -> TicketRepository:
+    repository = TicketRepository(tmp_path / "service.db")
+    repository.init_schema()
+    seed_if_empty(repository)
+    return repository
 
 
 def triage(client, ticket_id="NG-1001"):
@@ -103,10 +123,62 @@ def test_retriage_is_allowed_for_triaged_ticket(client, provider):
     assert done["triage"]["ai_urgency"] == "critical"
 
 
-async def test_step_timeout_emits_llm_unavailable(tmp_path, provider, monkeypatch):
-    repo = TicketRepository(tmp_path / "test.db")
-    repo.init_schema()
-    seed_if_empty(repo)
+@pytest.mark.parametrize(
+    ("review", "status"),
+    [
+        (APPROVAL, TicketStatus.APPROVED),
+        (ReviewRequest(action="reject", review_note="wrong"), TicketStatus.REJECTED),
+    ],
+)
+def test_triage_reviewed_ticket_409(client, review, status):
+    triage(client)
+    client.app.state.repo.save_review("NG-1001", review, status)
+    response = client.post("/tickets/NG-1001/triage")
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "invalid_state"
+
+
+def test_blank_draft_emits_empty_draft_error(client, provider):
+    provider.draft_text = "   "
+    events = triage(client)
+    assert events[-1] == (
+        "error",
+        {"code": "empty_draft", "message": "The model returned an empty draft. Try again."},
+    )
+    assert "done" not in [event for event, _ in events]
+    assert client.get("/tickets/NG-1001").json()["status"] == "new"
+
+
+async def test_review_during_triage_discards_result(repo, provider):
+    first = PolicyResult(
+        category="billing",
+        urgency="high",
+        queue="Billing Team",
+        reason="Duplicate charge.",
+        confidence=0.9,
+        flags=[],
+    )
+    repo.save_triage("NG-1001", first, "first draft", "m", 1, 1)
+    events = []
+    async for item in TriageService(repo, provider, 0.6).run(repo.get("NG-1001")):
+        events.append(item)
+        if item.event == "classified":
+            repo.save_review("NG-1001", APPROVAL, TicketStatus.APPROVED)
+
+    assert events[-1].event == "error"
+    assert events[-1].data == {
+        "code": "invalid_state",
+        "message": "Ticket NG-1001 was reviewed while triage was running; "
+        "the new result was discarded.",
+    }
+    assert "done" not in [item.event for item in events]
+    ticket = repo.get("NG-1001")
+    assert ticket.status == TicketStatus.APPROVED
+    assert ticket.triage.ai_draft == "first draft"
+    assert ticket.triage.final_draft == "Edited by a human."
+
+
+async def test_step_timeout_emits_llm_unavailable(repo, provider, monkeypatch):
     monkeypatch.setattr(
         provider, "classifier", lambda: SlowChatModel(responses=[classification_json()])
     )

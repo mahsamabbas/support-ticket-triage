@@ -50,6 +50,10 @@ LEFT JOIN triage_results r ON r.ticket_id = t.id
 """
 
 
+class TicketStateChangedError(RuntimeError):
+    """The ticket left the triageable states before a triage result could be saved."""
+
+
 def utc_now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
@@ -169,7 +173,19 @@ class TicketRepository:
         classify_ms: int,
         draft_ms: int,
     ) -> Ticket:
+        """Raise TicketStateChangedError, writing nothing, unless the ticket is new or triaged."""
         with self._connect() as conn:
+            updated = conn.execute(
+                "UPDATE tickets SET status = ? WHERE id = ? AND status IN (?, ?)",
+                (
+                    TicketStatus.TRIAGED.value,
+                    ticket_id,
+                    TicketStatus.NEW.value,
+                    TicketStatus.TRIAGED.value,
+                ),
+            )
+            if updated.rowcount == 0:
+                raise TicketStateChangedError(ticket_id)
             conn.execute(
                 """
                 INSERT INTO triage_results (
@@ -209,10 +225,6 @@ class TicketRepository:
                     draft_ms,
                     utc_now(),
                 ),
-            )
-            conn.execute(
-                "UPDATE tickets SET status = ? WHERE id = ?",
-                (TicketStatus.TRIAGED.value, ticket_id),
             )
         return self._require(ticket_id)
 

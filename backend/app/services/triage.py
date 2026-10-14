@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from time import perf_counter
 from typing import Any
 
-from app.db import TicketRepository
+from app.db import TicketRepository, TicketStateChangedError
 from app.domain.policy import apply_policy, fallback_result
 from app.domain.taxonomy import TicketStatus
 from app.llm.chains import LLMUnavailableError, classify, stream_draft
@@ -82,7 +82,18 @@ class TriageService:
         draft_ms = _elapsed_ms(started)
         yield TriageEvent("step", {"name": "draft", "state": "done", "ms": draft_ms})
 
-        saved = self._repo.save_triage(
-            ticket.id, result, draft, self._provider.model_name, classify_ms, draft_ms
-        )
+        try:
+            saved = self._repo.save_triage(
+                ticket.id, result, draft, self._provider.model_name, classify_ms, draft_ms
+            )
+        except TicketStateChangedError:
+            yield TriageEvent(
+                "error",
+                {
+                    "code": "invalid_state",
+                    "message": f"Ticket {ticket.id} was reviewed while triage was running; "
+                    "the new result was discarded.",
+                },
+            )
+            return
         yield TriageEvent("done", saved.model_dump(mode="json"))
