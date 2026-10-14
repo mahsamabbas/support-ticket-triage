@@ -1,0 +1,841 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "QueueWise API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/taxonomy": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Taxonomy",
+        "operationId": "taxonomy_taxonomy_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxonomyOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stats": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Stats",
+        "operationId": "stats_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets": {
+      "get": {
+        "tags": [
+          "tickets"
+        ],
+        "summary": "List Tickets",
+        "operationId": "list_tickets_tickets_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TicketStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "queue",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Queue"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Queue"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Ticket"
+                  },
+                  "title": "Response List Tickets Tickets Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "tickets"
+        ],
+        "summary": "Create Ticket",
+        "operationId": "create_ticket_tickets_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TicketCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ticket"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket_id}": {
+      "get": {
+        "tags": [
+          "tickets"
+        ],
+        "summary": "Get Ticket",
+        "operationId": "get_ticket_tickets__ticket_id__get",
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ticket"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket_id}/review": {
+      "post": {
+        "tags": [
+          "tickets"
+        ],
+        "summary": "Review",
+        "operationId": "review_tickets__ticket_id__review_post",
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ticket"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket_id}/triage": {
+      "post": {
+        "tags": [
+          "triage"
+        ],
+        "summary": "Triage Ticket",
+        "operationId": "triage_ticket_tickets__ticket_id__triage_post",
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticket Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Triage events",
+            "content": {
+              "text/event-stream": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Category": {
+        "type": "string",
+        "enum": [
+          "billing",
+          "technical",
+          "account",
+          "shipping",
+          "general"
+        ],
+        "title": "Category"
+      },
+      "Flag": {
+        "type": "string",
+        "enum": [
+          "low_confidence",
+          "inconsistent_route",
+          "ai_output_invalid"
+        ],
+        "title": "Flag"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded"
+            ],
+            "title": "Status"
+          },
+          "ollama_reachable": {
+            "type": "boolean",
+            "title": "Ollama Reachable"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "model_available": {
+            "type": "boolean",
+            "title": "Model Available"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "ollama_reachable",
+          "model",
+          "model_available"
+        ],
+        "title": "HealthOut"
+      },
+      "Queue": {
+        "type": "string",
+        "enum": [
+          "Billing Team",
+          "Tech Support",
+          "Account Security",
+          "Logistics",
+          "Customer Care",
+          "Needs Manual Triage"
+        ],
+        "title": "Queue"
+      },
+      "ReviewAction": {
+        "type": "string",
+        "enum": [
+          "approve",
+          "reject"
+        ],
+        "title": "ReviewAction"
+      },
+      "ReviewRequest": {
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/ReviewAction"
+          },
+          "final_category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Category"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "final_urgency": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Urgency"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "final_queue": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Queue"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "final_draft": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Draft"
+          },
+          "review_note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "ReviewRequest"
+      },
+      "RoutableQueue": {
+        "type": "string",
+        "enum": [
+          "Billing Team",
+          "Tech Support",
+          "Account Security",
+          "Logistics",
+          "Customer Care"
+        ],
+        "title": "RoutableQueue"
+      },
+      "StatsOut": {
+        "properties": {
+          "by_status": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/TicketStatus"
+            },
+            "type": "object",
+            "title": "By Status"
+          },
+          "open_by_queue": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/Queue"
+            },
+            "type": "object",
+            "title": "Open By Queue"
+          },
+          "avg_confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Confidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "by_status",
+          "open_by_queue",
+          "avg_confidence"
+        ],
+        "title": "StatsOut"
+      },
+      "TaxonomyOut": {
+        "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/Category"
+            },
+            "type": "array",
+            "title": "Categories"
+          },
+          "urgencies": {
+            "items": {
+              "$ref": "#/components/schemas/Urgency"
+            },
+            "type": "array",
+            "title": "Urgencies"
+          },
+          "queues": {
+            "items": {
+              "$ref": "#/components/schemas/Queue"
+            },
+            "type": "array",
+            "title": "Queues"
+          },
+          "routable_queues": {
+            "items": {
+              "$ref": "#/components/schemas/RoutableQueue"
+            },
+            "type": "array",
+            "title": "Routable Queues"
+          },
+          "allowed_queues": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/Queue"
+              },
+              "type": "array"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/Category"
+            },
+            "type": "object",
+            "title": "Allowed Queues"
+          },
+          "confidence_threshold": {
+            "type": "number",
+            "title": "Confidence Threshold"
+          }
+        },
+        "type": "object",
+        "required": [
+          "categories",
+          "urgencies",
+          "queues",
+          "routable_queues",
+          "allowed_queues",
+          "confidence_threshold"
+        ],
+        "title": "TaxonomyOut"
+      },
+      "Ticket": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "customer_name": {
+            "type": "string",
+            "title": "Customer Name"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TicketStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "triage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TriageRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "customer_name",
+          "subject",
+          "body",
+          "status",
+          "created_at"
+        ],
+        "title": "Ticket"
+      },
+      "TicketCreate": {
+        "properties": {
+          "customer_name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Customer Name"
+          },
+          "subject": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 3,
+            "title": "Subject"
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 10,
+            "title": "Body"
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_name",
+          "subject",
+          "body"
+        ],
+        "title": "TicketCreate"
+      },
+      "TicketStatus": {
+        "type": "string",
+        "enum": [
+          "new",
+          "triaged",
+          "approved",
+          "rejected"
+        ],
+        "title": "TicketStatus"
+      },
+      "TriageRecord": {
+        "properties": {
+          "ai_category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "ai_urgency": {
+            "$ref": "#/components/schemas/Urgency"
+          },
+          "ai_queue": {
+            "$ref": "#/components/schemas/Queue"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "flags": {
+            "items": {
+              "$ref": "#/components/schemas/Flag"
+            },
+            "type": "array",
+            "title": "Flags"
+          },
+          "ai_draft": {
+            "type": "string",
+            "title": "Ai Draft"
+          },
+          "final_category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Category"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "final_urgency": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Urgency"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "final_queue": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Queue"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "final_draft": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Draft"
+          },
+          "review_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Note"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "classify_ms": {
+            "type": "integer",
+            "title": "Classify Ms"
+          },
+          "draft_ms": {
+            "type": "integer",
+            "title": "Draft Ms"
+          },
+          "triaged_at": {
+            "type": "string",
+            "title": "Triaged At"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ai_category",
+          "ai_urgency",
+          "ai_queue",
+          "reason",
+          "confidence",
+          "flags",
+          "ai_draft",
+          "model",
+          "classify_ms",
+          "draft_ms",
+          "triaged_at"
+        ],
+        "title": "TriageRecord"
+      },
+      "Urgency": {
+        "type": "string",
+        "enum": [
+          "low",
+          "medium",
+          "high",
+          "critical"
+        ],
+        "title": "Urgency"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
