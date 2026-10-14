@@ -5,6 +5,8 @@ export type AuditChange = { field: keyof Route; ai: string; agent: string };
 
 export const MANUAL_QUEUE: Queue = "Needs Manual Triage";
 
+export const DRAFT_MAX = 4000;
+
 const ROUTE_FIELDS = ["category", "urgency", "queue"] as const;
 
 export function buildAuditDiff(ai: Route, agent: Route): AuditChange[] {
@@ -42,5 +44,6 @@ export function approveBlockReason(taxonomy: Taxonomy, route: Route, draft: stri
   const allowed = taxonomy.allowed_queues[route.category] ?? [];
   if (!allowed.includes(route.queue)) return `${route.queue} does not handle ${route.category} tickets.`;
   if (!draft.trim()) return "The reply draft is empty.";
+  if (draft.trim().length > DRAFT_MAX) return `The reply draft is over ${DRAFT_MAX} characters.`;
   return null;
 }

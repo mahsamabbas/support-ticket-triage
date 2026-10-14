@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { Check, ShieldAlert, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -11,8 +12,9 @@ import { Textarea } from "@/components/ui/textarea";
 import type { TriageStreamState } from "@/hooks/use-triage-stream";
 import { ApiError } from "@/lib/api";
 import { formatTimestamp } from "@/lib/format";
-import { useReviewTicket, useTaxonomy } from "@/lib/queries";
+import { queryKeys, useReviewTicket, useTaxonomy } from "@/lib/queries";
 import {
+  DRAFT_MAX,
   MANUAL_QUEUE,
   aiRoute,
   approveBlockReason,
@@ -34,7 +36,7 @@ const FLAG_COPY: Record<Flag, string> = {
 
 const SECTION_LABEL = "font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground";
 
-const DRAFT_MAX = 4000;
+const BLOCK_REASON_ID = "approve-block-reason";
 
 type Props = { ticket: Ticket | null; stream: TriageStreamState | null; isRunning: boolean };
 
@@ -141,6 +143,7 @@ function ReviewForm({ ticket, triage, taxonomy }: ReviewFormProps) {
   const [route, setRoute] = useState<Route>(() => finalRoute(triage) ?? ai);
   const [draft, setDraft] = useState(() => triage.final_draft ?? triage.ai_draft);
   const review = useReviewTicket();
+  const queryClient = useQueryClient();
   const changes = buildAuditDiff(ai, route);
   const blockReason = approveBlockReason(taxonomy, route, draft);
   const allowedQueues = taxonomy.allowed_queues[route.category] ?? [];
@@ -160,7 +163,13 @@ function ReviewForm({ ticket, triage, taxonomy }: ReviewFormProps) {
       {
         onSuccess: (saved) =>
           toast.success(action === "approve" ? `${saved.id} approved for ${route.queue}` : `${saved.id} rejected`),
-        onError: (error) => toast.error(error instanceof ApiError ? error.message : "Review failed."),
+        onError: (error) => {
+          toast.error(error instanceof ApiError ? error.message : "Review failed.");
+          if (error instanceof ApiError && error.status === 409) {
+            void queryClient.invalidateQueries({ queryKey: queryKeys.ticket(ticket.id) });
+            void queryClient.invalidateQueries({ queryKey: ["tickets"] });
+          }
+        },
       },
     );
   }
@@ -213,9 +222,7 @@ function ReviewForm({ ticket, triage, taxonomy }: ReviewFormProps) {
           rows={10}
           className="resize-none bg-background/50 text-sm leading-relaxed"
         />
-        <p className="text-xs text-muted-foreground">
-          Nothing is sent. Approving records this draft for the {route.queue} queue.
-        </p>
+        <p className="text-xs text-muted-foreground">{draftNote(ticket.status, route.queue)}</p>
       </div>
       {locked ? (
         <LockedNotice status={ticket.status} reviewedAt={triage.reviewed_at ?? null} />
@@ -230,13 +237,16 @@ function ReviewForm({ ticket, triage, taxonomy }: ReviewFormProps) {
               className="flex-1"
               data-action="approve"
               disabled={review.isPending || blockReason !== null}
+              aria-describedby={blockReason ? BLOCK_REASON_ID : undefined}
               onClick={() => submit("approve")}
             >
               <Check className="size-4" />
               Approve draft
             </Button>
           </div>
-          {blockReason && <p className="text-xs text-urgency-high">{blockReason}</p>}
+          <p id={BLOCK_REASON_ID} aria-live="polite" className="min-h-4 text-xs text-urgency-high">
+            {blockReason}
+          </p>
         </div>
       )}
     </div>
@@ -264,15 +274,25 @@ function RouteSelect<T extends string>({ label, value, options, disabled, onChan
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {options.map((option) => (
-            <SelectItem key={option} value={option} className={cn("capitalize", isDimmed?.(option) && "opacity-50")}>
-              {option}
-            </SelectItem>
-          ))}
+          {options.map((option) => {
+            const dimmed = isDimmed?.(option) ?? false;
+            return (
+              <SelectItem key={option} value={option} className={cn("capitalize", dimmed && "opacity-50")}>
+                {option}
+                {dimmed && <span className="sr-only"> (not handled for this category)</span>}
+              </SelectItem>
+            );
+          })}
         </SelectContent>
       </Select>
     </div>
   );
+}
+
+function draftNote(status: TicketStatus, queue: string): string {
+  if (status === "approved") return `Approved for the ${queue} queue. Nothing was sent to the customer.`;
+  if (status === "rejected") return "Rejected. The AI decision was not used.";
+  return `Nothing is sent. Approving records this draft for the ${queue} queue.`;
 }
 
 function LockedNotice({ status, reviewedAt }: { status: TicketStatus; reviewedAt: string | null }) {

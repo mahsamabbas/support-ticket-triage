@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { approveBlockReason, buildAuditDiff, finalRoute, type Route } from "./review";
+import { DRAFT_MAX, approveBlockReason, buildAuditDiff, finalRoute, type Route } from "./review";
 import type { Taxonomy, TriageRecord } from "./types";
 
 const taxonomy: Taxonomy = {
@@ -52,6 +52,12 @@ describe("approveBlockReason", () => {
   });
   it("blocks an empty draft", () => {
     expect(approveBlockReason(taxonomy, ai, "   ")).toMatch(/empty/);
+  });
+  it("blocks a draft over the backend cap but allows exactly the cap", () => {
+    expect(approveBlockReason(taxonomy, ai, "a".repeat(DRAFT_MAX + 1))).toBe(
+      "The reply draft is over 4000 characters.",
+    );
+    expect(approveBlockReason(taxonomy, ai, ` ${"a".repeat(DRAFT_MAX)} `)).toBeNull();
   });
 });
 

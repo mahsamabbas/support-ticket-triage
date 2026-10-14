@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { useTriageStream } from "@/hooks/use-triage-stream";
+import { useTriageStream, type TriageOutcome } from "@/hooks/use-triage-stream";
 import type { TicketFilters } from "@/lib/api";
 import { useTicket, useTickets } from "@/lib/queries";
 import { DecisionPanel } from "./decision-panel";
@@ -20,15 +20,29 @@ export function Console() {
   const [newTicketOpen, setNewTicketOpen] = useState(false);
   const tickets = useTickets(filters);
   const list = tickets.data ?? [];
+  if (selectedId === null && list[0]) setSelectedId(list[0].id);
   const activeId = selectedId ?? list[0]?.id ?? null;
   const ticket = useTicket(activeId);
   const triage = useTriageStream();
   const stream = triage.state.ticketId === activeId ? triage.state : null;
 
-  async function runTriage(id: string) {
+  async function runTriage(id: string): Promise<TriageOutcome> {
+    setSelectedId(id);
     const outcome = await triage.start(id);
-    if (outcome.ok) toast.success(`${outcome.ticket.id} → ${outcome.ticket.triage?.ai_queue}`);
-    else if (!SILENT_TRIAGE_ERRORS.has(outcome.error.code)) toast.error(outcome.error.message);
+    if (outcome.ok) {
+      const queue = outcome.ticket.triage?.ai_queue;
+      toast.success(queue ? `${outcome.ticket.id} → ${queue}` : `${outcome.ticket.id} triaged`);
+    } else if (!SILENT_TRIAGE_ERRORS.has(outcome.error.code)) {
+      toast.error(outcome.error.message);
+    }
+    return outcome;
+  }
+
+  async function triageCreated(id: string) {
+    const outcome = await runTriage(id);
+    if (!outcome.ok && outcome.error.code === "busy") {
+      toast.info(`${id} created. Another triage is running, run this one when it finishes.`);
+    }
   }
 
   return (
@@ -59,7 +73,7 @@ export function Console() {
         onOpenChange={setNewTicketOpen}
         onCreated={(created, triageNow) => {
           setSelectedId(created.id);
-          if (triageNow) void runTriage(created.id);
+          if (triageNow) void triageCreated(created.id);
         }}
       />
     </div>

@@ -29,8 +29,17 @@ Urgency guide:
 - medium: degraded experience or delayed delivery.
 - low: questions and simple changes.
 
-confidence is a number from 0 to 1. Use a value below 0.5 when the ticket is vague or is missing \
-the details needed to route it.
+confidence is a number from 0 to 1 that says how sure you are about the queue. Score it with \
+this rubric:
+- 0.85 to 1.0: the ticket names a concrete problem (a charge, a login, a delivery, a crash) \
+and enough detail to act on.
+- 0.6 to 0.8: the problem type is clear but important details are missing.
+- 0.1 to 0.5: you cannot tell what product, order or problem the customer means (for example \
+"it's not working" or "that thing again"). Any queue would be a guess.
+Calibration examples (not real tickets):
+- "My order arrived with a cracked screen, order #881" -> confidence 0.9
+- "hello?? still waiting, please fix" -> confidence 0.25, nothing says what is wrong
+- "the app thing is acting up again" -> confidence 0.35, no product, symptom or account detail
 reason: one plain sentence, under 160 characters, explaining the queue choice.
 
 {INJECTION_RULE}

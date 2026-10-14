@@ -185,6 +185,15 @@ def test_classify_prompt_asks_for_a_reason_well_below_the_schema_cap():
     assert "280" not in system
 
 
+def test_classify_prompt_keeps_the_confidence_calibration_rubric():
+    messages = CLASSIFY_PROMPT.format_messages(
+        customer_name="Eve", subject="Late order", body="Where is my order?"
+    )
+    system = messages[0].content
+    assert "- 0.1 to 0.5: you cannot tell what product, order or problem" in system
+    assert "Calibration examples (not real tickets):" in system
+
+
 def test_ollama_classifier_sends_json_schema_format():
     provider = OllamaProvider(Settings(_env_file=None))
     classifier = provider.classifier()

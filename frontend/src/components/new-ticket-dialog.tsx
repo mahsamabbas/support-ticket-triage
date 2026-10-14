@@ -58,26 +58,29 @@ export function NewTicketDialog({ open, onOpenChange, onCreated }: Props) {
   } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: DEFAULTS });
   const body = useWatch({ control, name: "body" });
 
+  function handleOpenChange(next: boolean) {
+    if (!next) reset(DEFAULTS);
+    onOpenChange(next);
+  }
+
   const onSubmit = handleSubmit(async ({ triageNow, ...payload }) => {
     try {
       const ticket = await create.mutateAsync(payload);
       toast.success(`${ticket.id} created`);
-      reset(DEFAULTS);
-      onOpenChange(false);
+      handleOpenChange(false);
       onCreated(ticket, triageNow);
     } catch (error) {
-      if (error instanceof ApiError && Object.keys(error.fields).length > 0) {
-        for (const [field, message] of Object.entries(error.fields)) {
-          if (field in payload) setError(field as TicketField, { message });
-        }
-        return;
+      if (error instanceof ApiError) {
+        const known = Object.entries(error.fields).filter(([field]) => field in payload);
+        for (const [field, message] of known) setError(field as TicketField, { message });
+        if (known.length > 0) return;
       }
       toast.error(error instanceof ApiError ? error.message : "Could not create the ticket.");
     }
   });
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>New ticket</DialogTitle>
@@ -85,13 +88,13 @@ export function NewTicketDialog({ open, onOpenChange, onCreated }: Props) {
         </DialogHeader>
         <form onSubmit={onSubmit} noValidate className="grid gap-4">
           <Field id="customer_name" label="Customer name" error={errors.customer_name?.message}>
-            <Input id="customer_name" aria-invalid={Boolean(errors.customer_name)} {...register("customer_name")} />
+            <Input id="customer_name" {...errorProps("customer_name", errors.customer_name)} {...register("customer_name")} />
           </Field>
           <Field id="subject" label="Subject" error={errors.subject?.message}>
-            <Input id="subject" aria-invalid={Boolean(errors.subject)} {...register("subject")} />
+            <Input id="subject" {...errorProps("subject", errors.subject)} {...register("subject")} />
           </Field>
           <Field id="body" label="Message" error={errors.body?.message} hint={`${body.length}/${BODY_MAX}`}>
-            <Textarea id="body" rows={6} aria-invalid={Boolean(errors.body)} {...register("body")} />
+            <Textarea id="body" rows={6} {...errorProps("body", errors.body)} {...register("body")} />
           </Field>
           <Controller
             control={control}
@@ -104,7 +107,7 @@ export function NewTicketDialog({ open, onOpenChange, onCreated }: Props) {
             )}
           />
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="ghost" onClick={() => handleOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={create.isPending}>
@@ -117,6 +120,14 @@ export function NewTicketDialog({ open, onOpenChange, onCreated }: Props) {
   );
 }
 
+function errorId(id: string) {
+  return `${id}-error`;
+}
+
+function errorProps(id: TicketField, error: unknown) {
+  return error ? { "aria-invalid": true, "aria-describedby": errorId(id) } : { "aria-invalid": false };
+}
+
 type FieldProps = { id: string; label: string; error?: string; hint?: string; children: ReactNode };
 
 function Field({ id, label, error, hint, children }: FieldProps) {
@@ -127,7 +138,11 @@ function Field({ id, label, error, hint, children }: FieldProps) {
         {hint && <span className="font-mono text-[11px] text-muted-foreground">{hint}</span>}
       </div>
       {children}
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && (
+        <p id={errorId(id)} role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
