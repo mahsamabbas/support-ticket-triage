@@ -1,6 +1,7 @@
 from app.db import TicketRepository
-from app.errors import NotFoundError
-from app.schemas import Ticket
+from app.domain.taxonomy import Queue, TicketStatus, is_route_allowed
+from app.errors import InvalidRouteError, InvalidStateError, NotFoundError
+from app.schemas import ReviewAction, ReviewRequest, Ticket
 
 
 def require_ticket(repo: TicketRepository, ticket_id: str) -> Ticket:
@@ -8,3 +9,22 @@ def require_ticket(repo: TicketRepository, ticket_id: str) -> Ticket:
     if ticket is None:
         raise NotFoundError(f"Ticket {ticket_id} does not exist.")
     return ticket
+
+
+def review_ticket(repo: TicketRepository, ticket_id: str, review: ReviewRequest) -> Ticket:
+    ticket = require_ticket(repo, ticket_id)
+    if ticket.status != TicketStatus.TRIAGED:
+        raise InvalidStateError(
+            f"Ticket {ticket_id} is {ticket.status.value}; only triaged tickets can be reviewed."
+        )
+    if review.action == ReviewAction.REJECT:
+        return repo.save_review(ticket_id, review, TicketStatus.REJECTED)
+
+    category, queue = review.final_category, review.final_queue
+    if category is None or queue is None:
+        raise InvalidRouteError("Approving needs a category and a queue.")
+    if queue == Queue.MANUAL_TRIAGE:
+        raise InvalidRouteError("Pick a real queue before approving; manual triage is not a team.")
+    if not is_route_allowed(category, queue):
+        raise InvalidRouteError(f"{queue.value} does not handle {category.value} tickets.")
+    return repo.save_review(ticket_id, review, TicketStatus.APPROVED)
