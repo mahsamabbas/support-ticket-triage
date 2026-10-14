@@ -21,6 +21,7 @@ from scripts.eval_cases import HELD_OUT_V1
 from scripts.eval_cases_v2 import HELD_OUT_V2
 from scripts.eval_cases_v3 import HELD_OUT_V3
 
+# Describes the d7f3a2c run. Update it and the v3 title before the next live run.
 HISTORY = (
     "History:",
     "",
@@ -55,7 +56,7 @@ EVAL_SETS: tuple[tuple[str, Sequence[SeedTicket]], ...] = (
     ("Seed tickets (used while tuning the prompt)", SEED_TICKETS),
     ("Held-out v1 (used to diagnose these fixes)", HELD_OUT_V1),
     ("Held-out v2 (written blind; second run, see history)", HELD_OUT_V2),
-    ("Held-out v3 (written blind after the last change; first run)", HELD_OUT_V3),
+    ("Held-out v3 (written blind after the last classify-prompt change; first run)", HELD_OUT_V3),
 )
 
 

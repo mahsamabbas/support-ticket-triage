@@ -9,7 +9,7 @@ Portfolio app 6 of 10. Scope: classify sample tickets, explain the suggested que
 ## What it does
 
 - **Two-step LangChain pipeline.** *Classify* returns JSON constrained by a JSON schema and validated by Pydantic (one repair retry). *Draft* streams the reply token by token.
-- **Routing policy in code, not in the prompt.** Confidence below 0.6, a queue that does not serve the category, or instruction-like text caught by the injection detector sends the ticket to `Needs Manual Triage` with a flag. The draft then asks the customer for details, or, when the only flag is suspected injection, answers the genuine request without acting on the embedded instructions. The model also answers `concrete_issue` (does the ticket state an actionable problem?) just before scoring confidence. It is not a routing rule; it was added together with prompt changes that coincided with better confidence on vague tickets, and its effect was not isolated.
+- **Routing policy in code, not in the prompt.** Confidence below 0.6, a queue that does not serve the category, or instruction-like text caught by the injection detector sends the ticket to `Needs Manual Triage` with a flag. The draft then asks the customer for details, or, when the only flag is suspected injection, acknowledges the genuine request and promises a follow-up, without acting on the embedded instructions. The model also answers `concrete_issue` (does the ticket state an actionable problem?) just before scoring confidence. It is not a routing rule; it was added together with prompt changes that coincided with better confidence on vague tickets, and its effect was not isolated.
 - **Live pipeline over SSE.** Both steps animate in the UI with their timings.
 - **Human in control.** Category, urgency and queue are editable; Approve is blocked until the route is valid. Every change against the AI suggestion shows as an audit chip.
 - **Triage all new.** One click walks every new ticket through the pipeline with a progress bar. **Stop** ends the run at any time, and it stops by itself if the model or API goes offline. You can keep browsing other tickets while it runs.
@@ -134,7 +134,7 @@ Letter shortcuts are ignored while typing in a field or when a dialog is open.
 ## Tests
 
 ```bash
-cd backend && .venv/bin/pytest -q    # 203 passed
+cd backend && .venv/bin/pytest -q    # 208 passed
 cd frontend && npm test              # 85 passed
 ```
 
@@ -145,7 +145,7 @@ Failure cases: low confidence, queue that does not fit the category, instruction
 
 `backend/scripts/eval_triage.py` classifies the 10 seed tickets and three sets of 12 held-out tickets with the live model, applies the same policy and injection check as the API, and scores category, urgency and queue against expected labels (`cd backend && .venv/bin/python -m scripts.eval_triage --out ../docs/eval-results.md`).
 
-**Honest blind number** — held-out v3, written blind after the last prompt/policy change and run once (`qwen2.5:7b`, median classify 1461 ms):
+**Honest blind number** — held-out v3, written blind after the last classify-prompt change (e913355) and run once (`qwen2.5:7b`, median classify 1461 ms):
 
 - Held-out v3 (n=12, single run): Category 10/10 · Urgency 7/10 · Queue 11/12
 
@@ -167,7 +167,7 @@ History: before the safeguards the seed queue score was 9/10 and held-out v1 9/1
 - Drafts are not grounded in store policy. Asked a direct factual question ("what are your weekend hours?"), the model sometimes invents an answer despite a prompt rule against it. A real deployment would draft from a policy knowledge base.
 - Confidence is the model's self-reported score, steered by a rubric and examples in the prompt. It is not a calibrated probability.
 - Model-reported signals can be wrong: routing on `concrete_issue` sent many clear, simple questions to manual triage, so it is only used as a reasoning step.
-- The injection detector is a set of regular expressions. Attacks worded outside its patterns get past it: the v2 injection was a fake system note the original patterns did not cover, and the v3 injection still slips past the widened set (the model labelled both correctly anyway). Unusual but honest wording can also trip it (it only ever sends a ticket to manual triage).
+- The injection detector is a set of regular expressions. Attacks worded outside its patterns get past it: the v2 injection was a fake system note the original patterns did not cover, and the v3 injection still slips past the widened set (the model labelled both correctly anyway). Unusual but honest wording can also trip it, such as "I set the priority to high in my calendar app" or "[System update] froze" (it only ever sends a ticket to manual triage).
 - Single agent, no authentication.
 - The draft is not regenerated after the agent changes the classification.
 - SQLite file storage, no multi-user concurrency.

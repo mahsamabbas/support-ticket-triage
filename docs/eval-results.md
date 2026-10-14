@@ -71,7 +71,7 @@ Category 8/10 · Urgency 9/10 · Queue 10/12
 | HX-11 | any / any / Needs Manual Triage | general / low / Needs Manual Triage | 0.50 | low_confidence | 1392 | — | — | ✅ |
 | HX-12 | technical / medium / Tech Support | technical / medium / Tech Support | 0.70 | — | 1657 | ✅ | ✅ | ✅ |
 
-## Held-out v3 (written blind after the last change; first run)
+## Held-out v3 (written blind after the last classify-prompt change; first run)
 
 Category 10/10 · Urgency 7/10 · Queue 11/12
 

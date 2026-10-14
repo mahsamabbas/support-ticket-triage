@@ -119,7 +119,9 @@ def test_render_reports_every_set_with_scores_and_latency():
 
 def test_eval_runs_v3_last_as_its_first_blind_run():
     assert [tickets for _, tickets in EVAL_SETS] == [SEED_TICKETS, *HELD_OUT_SETS]
-    assert V3_TITLE == "Held-out v3 (written blind after the last change; first run)"
+    assert V3_TITLE == (
+        "Held-out v3 (written blind after the last classify-prompt change; first run)"
+    )
 
 
 def test_history_keeps_earlier_runs_and_discloses_the_second_v2_run():

@@ -30,8 +30,9 @@ _PATTERNS = tuple(
         #    bug reports, so the line must also give the model an order.
         rf"^[ \t]*(?:system|assistant|developer)[ \t]*:[^\n]*\b{_ROLE_CUE}\b",
         # 2. Bracketed or tagged pseudo-system blocks and chat-template tokens.
-        r"\[\s*(?:system|admin|developer|inst)\b[^\]\n]{0,300}\]",
-        r"<\s*/?\s*(?:system|instructions?|admin|developer)\s*>",
+        #    "[Developer options]" is an Android menu, so "developer" is left out of brackets.
+        r"\[\s*(?:system|admin|inst)\b[^\]\n]{0,300}\]",
+        r"<\s*(?:/\s*)?(?:system|instructions?|admin|developer)\s*>",
         r"<\|\s*(?:im_start|im_end|system|endoftext)\s*\|>",
         # 2. Fake system notices. "a system message saying the update failed" is a normal bug
         #    report, so "system message" only counts as a label.
@@ -54,8 +55,8 @@ _PATTERNS = tuple(
         #    critical". "change the priority to urgent" stays allowed as ordinary customer wording.
         rf"\b(?:classify|categori[sz]e|route|mark|tag|label|assign|escalate|set|change|move)\s+"
         rf"(?:(?:the|this|its|ticket'?s)\s+)?{_FIELD}\s*(?:to|as|=|:)\s*{_FIELD_VALUE}\b",
-        # 3. Unquoted field assignments: "category=billing".
-        r"\b(?:category|urgency|queue|priority)\s*=\s*\w",
+        # 3. Unquoted field assignments: "category=billing". URLs and logs carry other values.
+        rf"\b(?:category|urgency|queue|priority)\s*=\s*{_TAXONOMY}\b",
         # 3. Commands that file the ticket under a taxonomy value. An explicit noun is required:
         #    customers say "route this to logistics" or "mark it as low priority" themselves.
         rf"\b(?:classify|categori[sz]e|route|mark|tag|label|assign|file)\s+"
@@ -69,7 +70,8 @@ _PATTERNS = tuple(
         r"\b(?:respond|reply|answer|output|return)\s+(?:only\s+with|with\s+only)\b",
         r"\boutput\s+(?:the\s+following|exactly|only)\b",
         r"\b(?:output|print|respond\s+with|reply\s+with)\s+(?:the\s+following\s+|this\s+)?json\b",
-        r'"\s*(?:category|urgency|queue|confidence|priority)\s*"\s*:',
+        rf'"\s*(?:category|urgency|queue|priority)\s*"\s*:\s*"\s*{_TAXONOMY}\b',
+        r'"\s*confidence\s*"\s*:\s*(?:[01](?:\.\d+)?|\.\d+)\b',
     )
 )
 
