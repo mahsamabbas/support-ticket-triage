@@ -40,7 +40,11 @@ Calibration examples (not real tickets):
 - "My order arrived with a cracked screen, order #881" -> confidence 0.9
 - "hello?? still waiting, please fix" -> confidence 0.25, nothing says what is wrong
 - "the app thing is acting up again" -> confidence 0.35, no product, symptom or account detail
-reason: one plain English sentence, under 160 characters, explaining the queue choice.
+reason: one short plain English sentence of at most 20 words that names the customer's problem \
+and why it fits the queue. Examples:
+- "Customer was charged twice for one order and wants the duplicate refunded."
+- "Package tracking has not updated for six days, so Logistics should investigate."
+- "Ticket gives no product, order or symptom, so the right queue is unclear."
 
 {INJECTION_RULE}
 Reply with JSON only."""

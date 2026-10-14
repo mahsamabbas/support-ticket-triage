@@ -189,7 +189,13 @@ def test_classify_prompt_asks_for_a_reason_well_below_the_schema_cap():
         customer_name="Eve", subject="Late order", body="Where is my order?"
     )
     system = messages[0].content
-    assert "reason: one plain English sentence, under 160 characters" in system
+    assert (
+        "reason: one short plain English sentence of at most 20 words that names the "
+        "customer's problem and why it fits the queue. Examples:\n"
+        '- "Customer was charged twice for one order and wants the duplicate refunded."\n'
+        '- "Package tracking has not updated for six days, so Logistics should investigate."\n'
+        '- "Ticket gives no product, order or symptom, so the right queue is unclear."\n'
+    ) in system
     assert "200" not in system
 
 
